@@ -17,6 +17,7 @@
     <style>
         .tab-active { border-bottom: 3px solid currentColor; }
         .thumbnail-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 1rem; }
+        .thumbnail-container > * { min-width: 0; }
         .pdf-thumbnail { width: 120px; cursor: pointer; transition: transform 0.2s; }
         .pdf-thumbnail:hover { transform: scale(1.05); }
         .pdf-thumbnail canvas { border: 2px solid #e5e7eb; border-radius: 8px; }
@@ -27,6 +28,7 @@
         .mode-split { background-color: #059669; }
         .mode-convert { background-color: #0284c7; }
         .mode-batch { background-color: #d97706; }
+        .mode-image { background-color: #e11d48; }
 
         /* ── Dark mode ── */
         :root {
@@ -49,12 +51,18 @@
         body.dark .bg-white { background-color: var(--bg-white) !important; }
         body.dark .text-gray-600, body.dark .text-gray-500 { color: var(--text-secondary) !important; }
         body.dark .text-gray-800 { color: var(--text-primary) !important; }
+        body.dark .text-gray-700 { color: var(--text-primary) !important; }
         body.dark .border-gray-300, body.dark .border-gray-200 { border-color: var(--border-color) !important; }
         body.dark .dropzone { border-color: var(--border-color); background-color: var(--accent-bg); }
         body.dark .dropzone.dragover { background-color: #1e3a5f; }
         body.dark input[type="text"], body.dark input[type="password"] { background-color: var(--accent-bg); color: var(--text-primary); border-color: var(--border-color); }
+        body.dark select { background-color: var(--accent-bg); color: var(--text-primary); border-color: var(--border-color); }
+        body.dark select option { background-color: var(--bg-white); color: var(--text-primary); }
         body.dark .bg-gray-50 { background-color: var(--accent-bg) !important; }
         body.dark .bg-gray-100 { background-color: var(--accent-bg) !important; }
+        body.dark .bg-gray-200 { background-color: var(--accent-bg) !important; }
+        body.dark .bg-amber-50 { background-color: #422006 !important; border-color: #78350f !important; }
+        body.dark .text-amber-700 { color: #fbbf24 !important; }
 
         /* ── Large text mode ── */
         body.large-text { font-size: 150%; }
@@ -65,7 +73,7 @@
     <div class="container mx-auto px-4 py-8 max-w-6xl">
         <header class="text-center mb-6">
             <div class="flex items-center justify-center gap-3 mb-3">
-                <h1 class="text-3xl font-bold text-gray-800">📚 專業 PDF 教職員工作站</h1>
+                <h1 class="text-xl sm:text-3xl font-bold text-gray-800 whitespace-nowrap">📚 專業 PDF 教職員工作站</h1>
                 <div class="flex gap-2 ml-4">
                     <button id="btn-dark" title="🌙 黑暗模式" class="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded-lg text-sm transition">🌙</button>
                     <button id="btn-large" title="🔤 大字模式" class="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded-lg text-sm transition">🔤</button>
@@ -74,18 +82,21 @@
             <p class="text-gray-600">100% 本地端處理 • 敏感資料零外流</p>
         </header>
 
-        <nav class="flex border-b border-gray-300 mb-6">
-            <button class="tab-btn flex-1 py-3 px-4 text-center font-medium text-indigo-600 hover:bg-indigo-50 transition tab-active" data-mode="merge">
+        <nav class="flex border-b border-gray-300 mb-6 overflow-x-auto whitespace-nowrap">
+            <button class="tab-btn flex-1 min-w-[7rem] py-3 px-4 text-center font-medium text-indigo-600 hover:bg-indigo-50 transition tab-active whitespace-nowrap" data-mode="merge">
                 📄 合併與重組
             </button>
-            <button class="tab-btn flex-1 py-3 px-4 text-center font-medium text-emerald-600 hover:bg-emerald-50 transition" data-mode="split">
+            <button class="tab-btn flex-1 min-w-[7rem] py-3 px-4 text-center font-medium text-emerald-600 hover:bg-emerald-50 transition whitespace-nowrap" data-mode="split">
                 ✂️ 提取與分割
             </button>
-            <button class="tab-btn flex-1 py-3 px-4 text-center font-medium text-sky-600 hover:bg-sky-50 transition" data-mode="convert">
+            <button class="tab-btn flex-1 min-w-[7rem] py-3 px-4 text-center font-medium text-sky-600 hover:bg-sky-50 transition whitespace-nowrap" data-mode="convert">
                 📝 Word 轉 PDF
             </button>
-            <button class="tab-btn flex-1 py-3 px-4 text-center font-medium text-amber-600 hover:bg-amber-50 transition" data-mode="batch">
+            <button class="tab-btn flex-1 min-w-[7rem] py-3 px-4 text-center font-medium text-amber-600 hover:bg-amber-50 transition whitespace-nowrap" data-mode="batch">
                 ⚙️ 批次加工作業
+            </button>
+            <button class="tab-btn flex-1 min-w-[7rem] py-3 px-4 text-center font-medium text-rose-600 hover:bg-rose-50 transition whitespace-nowrap" data-mode="image">
+                🖼️ 圖片轉 PDF
             </button>
         </nav>
 
@@ -174,12 +185,17 @@
             <section id="mode-convert" class="mode-panel hidden bg-white rounded-xl shadow-lg p-6">
                 <h2 class="text-xl font-bold text-sky-700 mb-4">📝 Word 轉 PDF</h2>
                 <p class="text-gray-600 mb-4">將 Word 文件 (.docx) 批次轉換為 PDF 格式。</p>
-                
+
                 <div id="convert-dropzone" class="dropzone rounded-xl p-8 text-center cursor-pointer mb-4">
                     <div class="text-4xl mb-2">📝</div>
                     <p class="text-gray-600">拖曳 Word/文字檔案到此處，或點擊上傳</p>
-                    <input type="file" id="convert-input" multiple accept=".docx,.doc,.txt,.rtf" class="hidden">
+                    <input type="file" id="convert-input" multiple accept=".docx,.txt,.rtf" class="hidden">
                 </div>
+
+                <p class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
+                    ⚠️ 支援格式：<code>.docx</code> / <code>.txt</code> / <code>.rtf</code>。
+                    舊版 <code>.doc</code> 唔支援，請用 Word 開啟後另存為 <code>.docx</code>。
+                </p>
 
                 <div id="convert-list" class="space-y-3 mb-4"></div>
 
@@ -218,6 +234,70 @@
                     批次加工下載
                 </button>
             </section>
+
+            <section id="mode-image" class="mode-panel hidden bg-white rounded-xl shadow-lg p-6">
+                <h2 class="text-xl font-bold text-rose-700 mb-4">🖼️ 圖片轉 PDF</h2>
+                <p class="text-gray-600 mb-4">將多張圖片批次轉成 PDF，支援拖曳排序與合併／獨立輸出。</p>
+
+                <div id="image-dropzone" class="dropzone rounded-xl p-8 text-center cursor-pointer mb-4">
+                    <div class="text-4xl mb-2">🖼️</div>
+                    <p class="text-gray-600">拖曳圖片到此處，或點擊上傳（可多選）</p>
+                    <input type="file" id="image-input" multiple accept="image/jpeg,image/png,image/webp,image/gif" class="hidden">
+                </div>
+
+                <p class="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-4">
+                    ℹ️ 支援格式：<code>.jpg</code> / <code>.jpeg</code> / <code>.png</code> / <code>.webp</code> / <code>.gif</code>。
+                    舊 iPhone <code>.heic</code> 唔支援，請用「相片 App → 分享 → 儲存為 JPEG」。
+                </p>
+
+                <div id="image-list" class="thumbnail-container mb-4"></div>
+
+                <div class="flex flex-wrap gap-4 mb-4">
+                    <div class="flex items-center gap-2">
+                        <label class="text-sm text-gray-600">輸出方式：</label>
+                        <select id="image-output-mode" class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                            <option value="merged" selected>合併成一個 PDF</option>
+                            <option value="zip">各自獨立 PDF（ZIP）</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <label class="text-sm text-gray-600">紙張：</label>
+                        <select id="image-paper-size" class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                            <option value="A4" selected>A4</option>
+                            <option value="A3">A3</option>
+                            <option value="Letter">Letter</option>
+                            <option value="original">原圖尺寸</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <label class="text-sm text-gray-600">方向：</label>
+                        <select id="image-orientation" class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                            <option value="portrait" selected>直向</option>
+                            <option value="landscape">橫向</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap gap-4 mb-4">
+                    <div class="flex items-center gap-2">
+                        <label class="text-sm text-gray-600">🔒 密碼保護（可選）：</label>
+                        <input type="password" id="image-password" placeholder="留空則不加密" class="px-3 py-2 border border-gray-300 rounded-lg text-sm w-48">
+                    </div>
+                    <div class="flex items-center gap-2 flex-1">
+                        <label class="text-sm text-gray-600">📝 輸出檔名：</label>
+                        <input type="text" id="image-filename" placeholder="合併檔名（預設：images）" value="images" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    </div>
+                </div>
+
+                <div class="flex gap-3">
+                    <button id="image-clear" class="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition">
+                        🗑️ 清空列表
+                    </button>
+                    <button id="image-execute" class="flex-1 py-3 bg-rose-600 text-white font-bold rounded-lg hover:bg-rose-700 transition disabled:bg-gray-300 disabled:cursor-not-allowed" disabled>
+                        開始轉換
+                    </button>
+                </div>
+            </section>
         </main>
 
         <footer class="text-center text-gray-500 text-sm mt-8">
@@ -238,17 +318,9 @@
             splitFile: null,
             splitPages: [],
             convertFiles: [],
-            batchFiles: []
+            batchFiles: [],
+            imageFiles: []
         };
-
-        function showLoading(text = '處理中，請稍候...') {
-            document.getElementById('loading-text').textContent = text;
-            document.getElementById('loading-overlay').classList.remove('hidden');
-        }
-
-        function hideLoading() {
-            document.getElementById('loading-overlay').classList.add('hidden');
-        }
 
         function naturalSort(files) {
             return files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
@@ -384,6 +456,7 @@
             }
 
             document.getElementById('merge-execute').disabled = state.mergeFiles.length < 2;
+            saveState();
         }
 
         document.getElementById('merge-add-blank').addEventListener('click', () => {
@@ -393,11 +466,13 @@
             const blankFile = new File([blankBytes], '空白頁.pdf', { type: 'application/pdf' });
             state.mergeFiles.push(blankFile);
             updateMergeList();
+            saveState();
         });
 
         document.getElementById('merge-clear').addEventListener('click', () => {
             state.mergeFiles = [];
             updateMergeList();
+            saveState();
         });
 
         document.getElementById('merge-execute').addEventListener('click', async () => {
@@ -418,7 +493,11 @@
 
                 let pdfBytes;
                 if (password) {
-                    mergedPdf.encrypt({ userPassword: password, ownerPassword: password });
+                    try {
+                        mergedPdf.encrypt(password, password);
+                    } catch (e) {
+                        alert('⚠️ 此瀏覽器模式不支援 PDF 加密，將輸出未加密版本。請用 Adobe Acrobat 加密後分發。');
+                    }
                 }
                 if (compressMode === 'none') {
                     pdfBytes = await mergedPdf.save({ useObjectStreams: false });
@@ -443,16 +522,18 @@
             if (files.length === 0) return;
             state.splitFile = files[0];
             showLoading('正在載入預覽...');
-            await renderAllPages(state.splitFile, document.getElementById('split-preview'), (pageNum) => {
-                const page = state.splitPages.find(p => p.pageNum === pageNum);
-                if (page) page.selected = !page.selected;
+            // Click handler in renderAllPages() already toggles state.splitPages[i].selected
+            // via the visual ring; callback only needs to refresh the action buttons.
+            await renderAllPages(state.splitFile, document.getElementById('split-preview'), () => {
                 updateSplitButtons();
+                saveState();
             });
             document.getElementById('split-select-all').classList.remove('hidden');
             document.getElementById('split-deselect-all').classList.remove('hidden');
             document.getElementById('split-extract').classList.remove('hidden');
             document.getElementById('split-zip').classList.remove('hidden');
             hideLoading();
+            saveState();
         });
 
         function updateSplitButtons() {
@@ -468,6 +549,7 @@
                 el.classList.remove('opacity-50');
             });
             updateSplitButtons();
+            saveState();
         });
 
         document.getElementById('split-deselect-all').addEventListener('click', () => {
@@ -477,6 +559,7 @@
                 el.classList.add('opacity-50');
             });
             updateSplitButtons();
+            saveState();
         });
 
         document.getElementById('split-extract').addEventListener('click', async () => {
@@ -491,7 +574,10 @@
                 pages.forEach(page => newPdf.addPage(page));
 
                 const password = document.getElementById('split-password').value;
-                if (password) newPdf.encrypt({ userPassword: password, ownerPassword: password });
+                if (password) {
+                    try { newPdf.encrypt(password, password); }
+                    catch (e) { alert('⚠️ 此瀏覽器模式不支援 PDF 加密，將輸出未加密版本。'); }
+                }
 
                 const pdfBytes = await newPdf.save();
                 const blob = new Blob([pdfBytes], { type: 'application/pdf' });
@@ -540,11 +626,23 @@
         });
 
         setupDropzone('convert-dropzone', 'convert-input', (files) => {
-            const supportedFiles = files.filter(f =>
-                f.name.endsWith('.docx') || f.name.endsWith('.doc') ||
-                f.name.endsWith('.txt') || f.name.endsWith('.rtf')
-            );
-            state.convertFiles = naturalSort([...state.convertFiles, ...supportedFiles]);
+            // S4: reject .doc here — mammoth browser build only supports .docx.
+            // .doc / .rtf / .txt are handled further down (txt/rtf direct read;
+            // .doc would produce a red-error PDF otherwise).
+            const accepted = [];
+            const rejected = [];
+            files.forEach(f => {
+                const lower = f.name.toLowerCase();
+                if (lower.endsWith('.docx') || lower.endsWith('.txt') || lower.endsWith('.rtf')) {
+                    accepted.push(f);
+                } else if (lower.endsWith('.doc')) {
+                    rejected.push(f.name);
+                }
+            });
+            if (rejected.length) {
+                alert(`以下檔案無法處理（mammoth 僅支援 .docx）：\n${rejected.join('\n')}\n請用 Word 另存為 .docx`);
+            }
+            state.convertFiles = naturalSort([...state.convertFiles, ...accepted]);
             updateConvertList();
         });
 
@@ -564,6 +662,7 @@
                 list.appendChild(item);
             });
             document.getElementById('convert-execute').disabled = state.convertFiles.length === 0;
+            saveState();
         }
 
         document.getElementById('convert-execute').addEventListener('click', async () => {
@@ -622,6 +721,7 @@
             const pdfFiles = files.filter(f => f.type === 'application/pdf');
             state.batchFiles = naturalSort([...state.batchFiles, ...pdfFiles]);
             updateBatchList();
+            saveState();
         });
 
         async function updateBatchList() {
@@ -646,6 +746,7 @@
                 list.appendChild(wrapper);
             }
             document.getElementById('batch-execute').disabled = state.batchFiles.length === 0;
+            saveState();
         }
 
         document.getElementById('batch-execute').addEventListener('click', async () => {
@@ -706,6 +807,277 @@
             hideLoading();
         });
 
+        // ─── Image → PDF mode ────────────────────────────────
+        // Paper sizes in points (1mm = 2.83464567pt)
+        const PAPER_SIZES = {
+            A4: { portrait: [595.28, 841.89], landscape: [841.89, 595.28] },
+            A3: { portrait: [841.89, 1190.55], landscape: [1190.55, 841.89] },
+            Letter: { portrait: [612, 792], landscape: [792, 612] }
+        };
+
+        // Convert arbitrary image file → PNG/JPEG bytes via canvas (handles webp/gif/bmp).
+        // Returns { bytes, mime } for pdf-lib embedding.
+        async function imageToEmbedBytes(file) {
+            const url = URL.createObjectURL(file);
+            try {
+                const img = await new Promise((resolve, reject) => {
+                    const im = new Image();
+                    im.onload = () => resolve(im);
+                    im.onerror = () => reject(new Error(`無法讀取圖片：${file.name}`));
+                    im.src = url;
+                });
+
+                // Auto-resize if either dim > 2400px (avoid huge PDF pages)
+                const MAX_DIM = 2400;
+                let { naturalWidth: w, naturalHeight: h } = img;
+                if (w > MAX_DIM || h > MAX_DIM) {
+                    const ratio = Math.min(MAX_DIM / w, MAX_DIM / h);
+                    w = Math.round(w * ratio);
+                    h = Math.round(h * ratio);
+                }
+
+                const canvas = document.createElement('canvas');
+                canvas.width = w;
+                canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, w, h);
+                ctx.drawImage(img, 0, 0, w, h);
+
+                // Pick format: PNG for transparency, JPEG for everything else
+                const hasAlpha = file.type === 'image/png' || file.type === 'image/webp' || file.type === 'image/gif';
+                const mime = hasAlpha ? 'image/png' : 'image/jpeg';
+                const blob = await new Promise((resolve, reject) => {
+                    canvas.toBlob(b => b ? resolve(b) : reject(new Error('canvas.toBlob 失敗')), mime, hasAlpha ? undefined : 0.92);
+                });
+                const bytes = new Uint8Array(await blob.arrayBuffer());
+                return { bytes, mime, width: w, height: h };
+            } finally {
+                URL.revokeObjectURL(url);
+            }
+        }
+
+        setupDropzone('image-dropzone', 'image-input', (files) => {
+            // Reject unsupported formats (heic/bmp/svg/tiff etc.)
+            const accepted = [];
+            const rejected = [];
+            files.forEach(f => {
+                const lower = f.name.toLowerCase();
+                const type = (f.type || '').toLowerCase();
+                const ok =
+                    type.startsWith('image/jpeg') || type.startsWith('image/png') ||
+                    type.startsWith('image/webp') || type.startsWith('image/gif') ||
+                    lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.png') ||
+                    lower.endsWith('.webp') || lower.endsWith('.gif');
+                if (ok) accepted.push(f);
+                else rejected.push(f.name);
+            });
+            if (rejected.length) {
+                alert(`以下檔案無法處理（不支援此圖片格式）：\n${rejected.join('\n')}\n支援：JPG / PNG / WebP / GIF`);
+            }
+            state.imageFiles = naturalSort([...state.imageFiles, ...accepted]);
+            updateImageList();
+            saveState();
+        });
+
+        let imageSortable = null;
+
+        async function updateImageList() {
+            const list = document.getElementById('image-list');
+            list.innerHTML = '';
+            const fragment = document.createDocumentFragment();
+
+            for (let index = 0; index < state.imageFiles.length; index++) {
+                const file = state.imageFiles[index];
+                const item = document.createElement('div');
+                item.className = 'bg-gray-50 rounded-lg p-2 text-sm cursor-move flex flex-col items-center';
+                item.dataset.id = index;
+
+                const thumbContainer = document.createElement('div');
+                thumbContainer.className = 'flex items-center justify-center h-28 bg-gray-100 rounded-lg mb-2 w-full overflow-hidden';
+
+                const label = document.createElement('p');
+                label.className = 'text-xs text-center truncate w-full px-1';
+                label.textContent = file.name;
+                label.title = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+
+                item.appendChild(thumbContainer);
+                item.appendChild(label);
+                fragment.appendChild(item);
+
+                // Render thumbnail async; detached items skipped via cleanup
+                renderImageThumbnail(file, thumbContainer).catch(err => {
+                    thumbContainer.innerHTML = `<span class="text-xs text-red-500 p-2 text-center">${err.message}</span>`;
+                });
+            }
+            list.appendChild(fragment);
+
+            if (state.imageFiles.length > 0) {
+                if (imageSortable) imageSortable.destroy();
+                imageSortable = new Sortable(list, {
+                    animation: 150,
+                    ghostClass: 'bg-rose-100',
+                    onEnd: (evt) => {
+                        const moved = state.imageFiles.splice(evt.oldIndex, 1)[0];
+                        state.imageFiles.splice(evt.newIndex, 0, moved);
+                        updateImageList();
+                        saveState();
+                    }
+                });
+            }
+            document.getElementById('image-execute').disabled = state.imageFiles.length === 0;
+            saveState();
+        }
+
+        function renderImageThumbnail(file, container) {
+            return new Promise((resolve, reject) => {
+                const url = URL.createObjectURL(file);
+                const img = new Image();
+                img.onload = () => {
+                    const MAX = 200;
+                    const ratio = Math.min(MAX / img.naturalWidth, MAX / img.naturalHeight, 1);
+                    const canvas = document.createElement('canvas');
+                    canvas.width = Math.round(img.naturalWidth * ratio);
+                    canvas.height = Math.round(img.naturalHeight * ratio);
+                    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                    URL.revokeObjectURL(url);
+                    container.appendChild(canvas);
+                    resolve();
+                };
+                img.onerror = () => {
+                    URL.revokeObjectURL(url);
+                    reject(new Error('圖片預覽失敗'));
+                };
+                img.src = url;
+            });
+        }
+
+        document.getElementById('image-clear').addEventListener('click', () => {
+            state.imageFiles = [];
+            updateImageList();
+            saveState();
+        });
+
+        function sanitizeFilename(name) {
+            // Strip OS-forbidden chars + trim trailing dot/space
+            return name.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace(/[.\s]+$/, '').slice(0, 200) || 'untitled';
+        }
+
+        document.getElementById('image-execute').addEventListener('click', async () => {
+            const outputMode = document.getElementById('image-output-mode').value;
+            const paperKey = document.getElementById('image-paper-size').value;
+            const orientation = document.getElementById('image-orientation').value;
+            const password = document.getElementById('image-password').value;
+            const baseFilename = sanitizeFilename(document.getElementById('image-filename').value.trim() || 'images');
+            const total = state.imageFiles.length;
+
+            showLoading(`正在轉換圖片...\n已處理 0/${total} 張`);
+            try {
+                const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+                const errors = [];
+
+                if (outputMode === 'merged') {
+                    const mergedPdf = await PDFLib.PDFDocument.create();
+                    for (let i = 0; i < state.imageFiles.length; i++) {
+                        const file = state.imageFiles[i];
+                        document.getElementById('loading-text').textContent =
+                            `正在轉換圖片...\n已處理 ${i + 1}/${total} 張`;
+                        try {
+                            const { bytes, mime } = await imageToEmbedBytes(file);
+                            const image = mime === 'image/png'
+                                ? await mergedPdf.embedPng(bytes)
+                                : await mergedPdf.embedJpg(bytes);
+                            const pageDims = paperKey === 'original'
+                                ? [image.width, image.height]
+                                : PAPER_SIZES[paperKey][orientation];
+                            const page = mergedPdf.addPage(pageDims);
+                            // Fit-to-page preserving aspect ratio
+                            const margin = 20;
+                            const availW = pageDims[0] - margin * 2;
+                            const availH = pageDims[1] - margin * 2;
+                            const scale = Math.min(availW / image.width, availH / image.height, 1);
+                            const drawW = image.width * scale;
+                            const drawH = image.height * scale;
+                            page.drawImage(image, {
+                                x: (pageDims[0] - drawW) / 2,
+                                y: (pageDims[1] - drawH) / 2,
+                                width: drawW,
+                                height: drawH
+                            });
+                        } catch (e) {
+                            errors.push(`${file.name}: ${e.message}`);
+                        }
+                    }
+                    if (errors.length === total) throw new Error('所有圖片都轉換失敗');
+                    if (password) {
+                        try { mergedPdf.encrypt(password, password); }
+                        catch (e) { alert('⚠️ 此瀏覽器模式不支援 PDF 加密，將輸出未加密版本。'); }
+                    }
+                    const pdfBytes = await mergedPdf.save({ useObjectStreams: true });
+                    downloadBlob(pdfBytes, baseFilename + '.pdf', 'application/pdf');
+                    if (errors.length) alert(`⚠️ 以下 ${errors.length} 張失敗，已略過：\n${errors.join('\n')}`);
+                } else {
+                    // ZIP mode: each image → its own 1-page PDF
+                    const zip = new JSZip();
+                    for (let i = 0; i < state.imageFiles.length; i++) {
+                        const file = state.imageFiles[i];
+                        document.getElementById('loading-text').textContent =
+                            `正在轉換圖片...\n已處理 ${i + 1}/${total} 張`;
+                        try {
+                            const { bytes, mime, width, height } = await imageToEmbedBytes(file);
+                            const subPdf = await PDFLib.PDFDocument.create();
+                            if (password) {
+                                try { subPdf.encrypt(password, password); }
+                                catch (e) { alert('⚠️ 此瀏覽器模式不支援 PDF 加密，將輸出未加密版本。'); }
+                            }
+                            const image = mime === 'image/png'
+                                ? await subPdf.embedPng(bytes)
+                                : await subPdf.embedJpg(bytes);
+                            const pageDims = paperKey === 'original'
+                                ? [width, height]
+                                : PAPER_SIZES[paperKey][orientation];
+                            const page = subPdf.addPage(pageDims);
+                            const margin = 20;
+                            const availW = pageDims[0] - margin * 2;
+                            const availH = pageDims[1] - margin * 2;
+                            const scale = Math.min(availW / width, availH / height, 1);
+                            const drawW = width * scale;
+                            const drawH = height * scale;
+                            page.drawImage(image, {
+                                x: (pageDims[0] - drawW) / 2,
+                                y: (pageDims[1] - drawH) / 2,
+                                width: drawW,
+                                height: drawH
+                            });
+                            const pdfBytes = await subPdf.save({ useObjectStreams: true });
+                            const stem = sanitizeFilename(file.name.replace(/\.[^.]+$/, ''));
+                            const entryName = `${stem}.pdf`;
+                            zip.file(entryName, pdfBytes);
+                        } catch (e) {
+                            errors.push(`${file.name}: ${e.message}`);
+                        }
+                    }
+                    if (errors.length === total) throw new Error('所有圖片都轉換失敗');
+                    const content = await zip.generateAsync({ type: 'blob' });
+                    downloadBlob(content, `${baseFilename}_${today}.zip`, 'application/zip');
+                    if (errors.length) alert(`⚠️ 以下 ${errors.length} 張失敗，已略過：\n${errors.join('\n')}`);
+                }
+            } catch (err) {
+                alert('轉換失敗：' + err.message);
+            }
+            hideLoading();
+        });
+
+        function downloadBlob(bytesOrBlob, filename, mime) {
+            const blob = bytesOrBlob instanceof Blob ? bytesOrBlob : new Blob([bytesOrBlob], { type: mime });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
         document.addEventListener('dragover', (e) => e.preventDefault());
         document.addEventListener('drop', (e) => e.preventDefault());
 
@@ -750,29 +1122,248 @@
             }
         });
 
-        // ─── Session Restore ────────────────────────────────
-        const STORAGE_KEY = 'pdf-workspace-state';
+        // ─── Session Restore (IndexedDB) ────────────────────
+        // PLAN §5: persist file arrays + page selection across reloads.
+        // localStorage alone can't hold Blobs (quota too small), so use IndexedDB.
 
-        function saveState() {
-            const meta = {
-                mergeFilename: document.getElementById('merge-filename')?.value || 'merged',
-                splitFilename: document.getElementById('split-filename')?.value || 'extracted'
-            };
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(meta));
+        const IDB_NAME = 'pdf-workspace';
+        const IDB_STORE = 'files';
+        const IDB_VERSION = 1;
+        const LS_META_KEY = 'pdf-workspace-meta';
+
+        function openDB() {
+            return new Promise((resolve, reject) => {
+                const req = indexedDB.open(IDB_NAME, IDB_VERSION);
+                req.onupgradeneeded = () => {
+                    const db = req.result;
+                    if (!db.objectStoreNames.contains(IDB_STORE)) {
+                        db.createObjectStore(IDB_STORE);
+                    }
+                };
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            });
         }
 
-        function loadState() {
+        async function idbPut(key, value) {
             try {
-                const raw = localStorage.getItem(STORAGE_KEY);
-                if (!raw) return;
-                const meta = JSON.parse(raw);
-                if (meta.mergeFilename) document.getElementById('merge-filename').value = meta.mergeFilename;
-                if (meta.splitFilename) document.getElementById('split-filename').value = meta.splitFilename;
+                const db = await openDB();
+                await new Promise((res, rej) => {
+                    const tx = db.transaction(IDB_STORE, 'readwrite');
+                    tx.objectStore(IDB_STORE).put(value, key);
+                    tx.oncomplete = res;
+                    tx.onerror = () => rej(tx.error);
+                });
+                db.close();
+            } catch (e) {
+                console.warn('[idbPut]', key, e);
+            }
+        }
+
+        async function idbGet(key) {
+            try {
+                const db = await openDB();
+                const value = await new Promise((res, rej) => {
+                    const tx = db.transaction(IDB_STORE, 'readonly');
+                    const req = tx.objectStore(IDB_STORE).get(key);
+                    req.onsuccess = () => res(req.result);
+                    req.onerror = () => rej(req.error);
+                });
+                db.close();
+                return value;
+            } catch (e) {
+                console.warn('[idbGet]', key, e);
+                return null;
+            }
+        }
+
+        async function idbClear() {
+            try {
+                const db = await openDB();
+                await new Promise((res, rej) => {
+                    const tx = db.transaction(IDB_STORE, 'readwrite');
+                    tx.objectStore(IDB_STORE).clear();
+                    tx.oncomplete = res;
+                    tx.onerror = () => rej(tx.error);
+                });
+                db.close();
             } catch {}
         }
 
+        function serializeFile(file) {
+            return { name: file.name, type: file.type, blob: file };
+        }
+
+        function deserializeFile(rec) {
+            if (!rec) return null;
+            return new File([rec.blob], rec.name, { type: rec.type });
+        }
+
+        async function saveState() {
+            // File arrays (Blob → IDB)
+            await idbPut('mergeFiles', state.mergeFiles.map(serializeFile));
+            await idbPut('batchFiles', state.batchFiles.map(serializeFile));
+            await idbPut('convertFiles', state.convertFiles.map(serializeFile));
+            await idbPut('imageFiles', state.imageFiles.map(serializeFile));
+            if (state.splitFile) {
+                await idbPut('splitFile', serializeFile(state.splitFile));
+                await idbPut('splitPages', state.splitPages.map(p => ({
+                    pageNum: p.pageNum, selected: p.selected
+                })));
+            } else {
+                await idbPut('splitFile', null);
+                await idbPut('splitPages', null);
+            }
+
+            // Lightweight UI state (localStorage — small JSON)
+            const meta = {
+                activeMode: document.querySelector('.tab-btn.tab-active')?.dataset.mode || 'merge',
+                mergeFilename: document.getElementById('merge-filename')?.value || 'merged',
+                splitFilename: document.getElementById('split-filename')?.value || 'extracted',
+                mergeCompress: document.getElementById('merge-compress')?.value || 'low',
+                batchPageNumbers: document.getElementById('batch-page-numbers')?.checked ?? true,
+                batchBlankPage: document.getElementById('batch-blank-page')?.checked ?? false,
+                imageFilename: document.getElementById('image-filename')?.value || 'images',
+                imageOutputMode: document.getElementById('image-output-mode')?.value || 'merged',
+                imagePaperSize: document.getElementById('image-paper-size')?.value || 'A4',
+                imageOrientation: document.getElementById('image-orientation')?.value || 'portrait',
+                savedAt: Date.now()
+            };
+            try {
+                localStorage.setItem(LS_META_KEY, JSON.stringify(meta));
+            } catch {}
+        }
+
+        function restoreFilenameInputs(meta) {
+            if (meta.mergeFilename) document.getElementById('merge-filename').value = meta.mergeFilename;
+            if (meta.splitFilename) document.getElementById('split-filename').value = meta.splitFilename;
+            if (meta.mergeCompress) document.getElementById('merge-compress').value = meta.mergeCompress;
+            const pn = document.getElementById('batch-page-numbers');
+            const bp = document.getElementById('batch-blank-page');
+            if (pn) pn.checked = meta.batchPageNumbers;
+            if (bp) bp.checked = meta.batchBlankPage;
+            if (meta.imageFilename) document.getElementById('image-filename').value = meta.imageFilename;
+            if (meta.imageOutputMode) document.getElementById('image-output-mode').value = meta.imageOutputMode;
+            if (meta.imagePaperSize) document.getElementById('image-paper-size').value = meta.imagePaperSize;
+            if (meta.imageOrientation) document.getElementById('image-orientation').value = meta.imageOrientation;
+        }
+
+        function restoreActiveTab(mode) {
+            if (!mode) return;
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('tab-active', b.dataset.mode === mode));
+            document.querySelectorAll('.mode-panel').forEach(p => {
+                p.classList.toggle('hidden', p.id !== `mode-${mode}`);
+            });
+        }
+
+        async function loadState() {
+            // Lightweight meta first (instant UI restore)
+            let meta = null;
+            try {
+                const raw = localStorage.getItem(LS_META_KEY);
+                if (raw) meta = JSON.parse(raw);
+            } catch {}
+            if (meta) {
+                restoreFilenameInputs(meta);
+                restoreActiveTab(meta.activeMode);
+            }
+
+            // Files from IDB (async)
+            const mergeRecs = await idbGet('mergeFiles');
+            const batchRecs = await idbGet('batchFiles');
+            const convertRecs = await idbGet('convertFiles');
+            const imageRecs = await idbGet('imageFiles');
+            const splitFileRec = await idbGet('splitFile');
+            const splitPagesRec = await idbGet('splitPages');
+
+            if (mergeRecs && mergeRecs.length) {
+                state.mergeFiles = mergeRecs.map(deserializeFile).filter(Boolean);
+                updateMergeList();
+            }
+            if (batchRecs && batchRecs.length) {
+                state.batchFiles = batchRecs.map(deserializeFile).filter(Boolean);
+                updateBatchList();
+            }
+            if (convertRecs && convertRecs.length) {
+                state.convertFiles = convertRecs.map(deserializeFile).filter(Boolean);
+                updateConvertList();
+            }
+            if (imageRecs && imageRecs.length) {
+                state.imageFiles = imageRecs.map(deserializeFile).filter(Boolean);
+                updateImageList();
+            }
+
+            if (splitFileRec) {
+                state.splitFile = deserializeFile(splitFileRec);
+                if (state.splitFile) {
+                    showLoading('正在還原分割預覽...');
+                    await renderAllPages(state.splitFile, document.getElementById('split-preview'), () => {
+                        updateSplitButtons();
+                    });
+                    // Restore page selection state
+                    if (splitPagesRec && splitPagesRec.length === state.splitPages.length) {
+                        splitPagesRec.forEach((rec, i) => {
+                            state.splitPages[i].selected = !!rec.selected;
+                            const wrapper = document.querySelector(`#split-preview .pdf-thumbnail[data-page="${i + 1}"]`);
+                            if (wrapper && rec.selected) {
+                                wrapper.classList.add('ring-4', 'ring-emerald-500');
+                                wrapper.classList.remove('opacity-50');
+                            }
+                        });
+                    }
+                    document.getElementById('split-select-all').classList.remove('hidden');
+                    document.getElementById('split-deselect-all').classList.remove('hidden');
+                    document.getElementById('split-extract').classList.remove('hidden');
+                    document.getElementById('split-zip').classList.remove('hidden');
+                    updateSplitButtons();
+                    hideLoading();
+                }
+            }
+
+            // If anything was restored, show a banner so user knows
+            const restored = (state.mergeFiles.length + state.batchFiles.length +
+                              state.convertFiles.length + state.imageFiles.length +
+                              (state.splitFile ? 1 : 0)) > 0;
+            if (restored) {
+                showRestoreBanner();
+            }
+        }
+
+        function showRestoreBanner() {
+            const banner = document.createElement('div');
+            banner.className = 'fixed top-20 left-1/2 -translate-x-1/2 bg-emerald-100 border border-emerald-400 text-emerald-800 px-4 py-2 rounded-lg shadow-lg text-sm z-50 flex items-center gap-3';
+            banner.innerHTML = `
+                <span>♻️ 已還原上次嘅工作狀態</span>
+                <button id="restore-clear" class="px-2 py-0.5 bg-emerald-200 hover:bg-emerald-300 rounded text-xs">清除並重新開始</button>
+                <button id="restore-dismiss" class="px-2 py-0.5 hover:bg-emerald-200 rounded text-xs">✕</button>
+            `;
+            document.body.appendChild(banner);
+            document.getElementById('restore-clear').addEventListener('click', async () => {
+                state.mergeFiles = [];
+                state.batchFiles = [];
+                state.convertFiles = [];
+                state.imageFiles = [];
+                state.splitFile = null;
+                state.splitPages = [];
+                await idbClear();
+                updateMergeList();
+                updateBatchList();
+                updateConvertList();
+                updateImageList();
+                document.getElementById('split-preview').innerHTML = '';
+                document.getElementById('split-select-all').classList.add('hidden');
+                document.getElementById('split-deselect-all').classList.add('hidden');
+                document.getElementById('split-extract').classList.add('hidden');
+                document.getElementById('split-zip').classList.add('hidden');
+                localStorage.removeItem(LS_META_KEY);
+                banner.remove();
+            });
+            document.getElementById('restore-dismiss').addEventListener('click', () => banner.remove());
+            setTimeout(() => banner.remove(), 8000);
+        }
+
         loadState();
-        window.addEventListener('beforeunload', saveState);
+        window.addEventListener('beforeunload', () => { saveState(); });
     </script>
 </body>
 </html>
