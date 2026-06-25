@@ -35,6 +35,8 @@
         .match-row { border-left: 3px solid transparent; transition: all 0.2s; }
         .match-row:hover { border-left-color: #7c3aed; background-color: rgba(124, 58, 237, 0.04); }
         body.dark .match-row:hover { background-color: rgba(124, 58, 237, 0.12); }
+        .redaction-disclaimer { background-color: #fef3c7; border-left: 3px solid #f59e0b; padding: 0.75rem; border-radius: 4px; font-size: 0.85rem; color: #78350f; }
+        body.dark .redaction-disclaimer { background-color: #422006; color: #fbbf24; border-left-color: #f59e0b; }
 
         /* ── Dark mode ── */
         :root {
@@ -357,16 +359,60 @@
                 <div id="search-results" class="space-y-2 mb-6"></div>
 
                 <div class="border-t border-gray-200 pt-6 mt-6">
-                    <h3 class="text-lg font-bold text-gray-800 mb-2">🔒 脫敏關鍵字清單（v3.0b 將整合脫敏流程）</h3>
-                    <p class="text-sm text-gray-600 mb-3">準備要遮罩嘅詞彙，例如學生姓名、學號、家長電話。v3.0a 只記錄；正式脫敏將於 v3.0b 啟用。</p>
+                    <h3 class="text-lg font-bold text-gray-800 mb-2">🔒 脫敏關鍵字清單</h3>
+                    <p class="text-sm text-gray-600 mb-3">準備要遮罩嘅詞彙，例如學生姓名、學號、家長電話。脫敏以視覺遮罩（黑色 rectangle）為主，建議執行後以 Adobe Reader 開啟確認文字真係刪走。</p>
                     <textarea id="redaction-keywords" rows="4" placeholder="一行一個關鍵字：&#10;陳小明&#10;李大文&#10;A123456(7)&#10;9123-4567" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono mb-2"></textarea>
-                    <div class="flex gap-3 items-center">
+                    <div class="flex flex-wrap gap-3 items-center mb-2">
                         <label class="flex items-center gap-2 text-sm text-gray-700">
                             <input type="file" id="redaction-keywords-file" accept=".txt,.csv" class="text-sm">
                             <span class="text-gray-500">或上傳 .txt / .csv 關鍵字清單</span>
                         </label>
                     </div>
-                    <p class="text-xs text-gray-500 mt-2" id="redaction-keyword-count">0 個關鍵字</p>
+                    <p class="text-xs text-gray-500 mb-3" id="redaction-keyword-count">0 個關鍵字</p>
+                    <div class="flex flex-wrap items-center gap-3 mb-2">
+                        <label class="flex items-center gap-2 text-sm text-gray-700">
+                            <input type="text" id="redaction-output-filename" placeholder="輸出檔名（預設：redacted）" value="redacted" class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm w-48">
+                        </label>
+                    </div>
+                    <button id="redaction-execute" class="w-full py-3 bg-red-700 text-white font-bold rounded-lg hover:bg-red-800 transition disabled:bg-gray-300 disabled:cursor-not-allowed" disabled>
+                        🔒 執行脫敏並下載
+                    </button>
+                </div>
+
+                <div class="border-t border-gray-200 pt-6 mt-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-2">🖼️ 浮水印</h3>
+                    <p class="text-sm text-gray-600 mb-3">喺 PDF 每一頁加對角 tiled 浮水印（5 個通用英文預設 + 用戶自選校徽 PNG）。浮水印會被燒入 PDF，無法以 Adobe Reader 移除。中文浮水印請使用「🖼️ 用戶上傳校徽 PNG」並上傳預先準備嘅中文圖片。</p>
+                    <div class="grid sm:grid-cols-2 gap-4 mb-3">
+                        <div>
+                            <label class="block text-xs text-gray-600 mb-1">📌 浮水印類型</label>
+                            <select id="watermark-type" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                                <option value="">— 無浮水印 —</option>
+                                <option value="text:DRAFT">DRAFT（草稿）</option>
+                                <option value="text:CONFIDENTIAL">CONFIDENTIAL（機密）</option>
+                                <option value="text:DO NOT COPY">DO NOT COPY（請勿複印）</option>
+                                <option value="text:NO_DIST">NO DISTRIBUTION</option>
+                                <option value="text:SKIP">SKIP（測試用）</option>
+                                <option value="image:uploaded">🖼️ 用戶上傳校徽 PNG（支援中文圖片）</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-600 mb-1">🌫️ 透明度 <span id="watermark-opacity-display" class="font-bold">15%</span></label>
+                            <input type="range" id="watermark-opacity" min="5" max="50" value="15" class="w-full">
+                        </div>
+                    </div>
+                    <div id="watermark-upload-row" class="hidden mb-3">
+                        <label class="block text-xs text-gray-600 mb-1">🖼️ 上傳校徽 PNG（建議 500×500，透明背景）</label>
+                        <input type="file" id="watermark-image" accept="image/png,image/jpeg" class="text-sm">
+                        <p id="watermark-image-info" class="text-xs text-gray-500 mt-1"></p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-3 mb-2">
+                        <label class="flex items-center gap-2 text-sm text-gray-700">
+                            <input type="text" id="watermark-output-filename" placeholder="輸出檔名（預設：watermarked）" value="watermarked" class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm w-48">
+                        </label>
+                    </div>
+                    <button id="watermark-execute" class="w-full py-3 bg-violet-700 text-white font-bold rounded-lg hover:bg-violet-800 transition disabled:bg-gray-300 disabled:cursor-not-allowed" disabled>
+                        🖼️ 套用浮水印並下載
+                    </button>
                 </div>
             </section>
         </main>
@@ -396,7 +442,11 @@
             searchCaseSensitive: false,
             searchWholeWord: false,
             searchResults: null,
-            redactionKeywords: ''
+            redactionKeywords: '',
+            watermarkType: '',
+            watermarkOpacity: 15,
+            watermarkImageData: null,  // { bytes, mime } for embedded PNG/JPEG
+            watermarkImageName: ''
         };
 
         function naturalSort(files) {
@@ -542,6 +592,8 @@
             state.searchFile = pdf;
             updateSearchFilename();
             updateSearchButton();
+            updateWatermarkButton();
+            updateRedactionButton();
             clearSearchResults();
             document.getElementById('search-status').classList.add('hidden');
         });
@@ -566,11 +618,16 @@
             document.getElementById('search-keyword').value = '';
             document.getElementById('search-filename-display').textContent = '';
             updateSearchButton();
+            updateWatermarkButton();
+            updateRedactionButton();
             clearSearchResults();
             document.getElementById('search-status').classList.add('hidden');
         });
 
-        document.getElementById('redaction-keywords').addEventListener('input', updateRedactionKeywordCount);
+        document.getElementById('redaction-keywords').addEventListener('input', () => {
+            updateRedactionKeywordCount();
+            updateRedactionButton();
+        });
 
         document.getElementById('redaction-keywords-file').addEventListener('change', async (e) => {
             const file = e.target.files[0];
@@ -704,6 +761,272 @@
                 `;
                 container.appendChild(row);
             });
+        }
+
+        // ── Watermark mode (v3.0b) ──
+        function updateWatermarkButton() {
+            const btn = document.getElementById('watermark-execute');
+            const type = document.getElementById('watermark-type').value;
+            const enabled = !!state.searchFile && (
+                type === '' ? false :
+                type === 'image:uploaded' ? !!state.watermarkImageData : true
+            );
+            btn.disabled = !enabled;
+        }
+
+        document.getElementById('watermark-type').addEventListener('change', (e) => {
+            state.watermarkType = e.target.value;
+            const uploadRow = document.getElementById('watermark-upload-row');
+            if (e.target.value === 'image:uploaded') {
+                uploadRow.classList.remove('hidden');
+            } else {
+                uploadRow.classList.add('hidden');
+            }
+            updateWatermarkButton();
+        });
+
+        document.getElementById('watermark-opacity').addEventListener('input', (e) => {
+            state.watermarkOpacity = parseInt(e.target.value, 10);
+            document.getElementById('watermark-opacity-display').textContent = `${state.watermarkOpacity}%`;
+        });
+
+        document.getElementById('watermark-image').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const buf = await file.arrayBuffer();
+            state.watermarkImageData = { bytes: buf, mime: file.type };
+            state.watermarkImageName = file.name;
+            document.getElementById('watermark-image-info').textContent = `📎 ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+            updateWatermarkButton();
+        });
+
+        document.getElementById('watermark-execute').addEventListener('click', applyWatermark);
+
+        async function applyWatermark() {
+            if (!state.searchFile) return;
+            const typeValue = document.getElementById('watermark-type').value;
+            if (!typeValue) return;
+            showSearchStatus('info', '⏳ 套用浮水印中...');
+
+            try {
+                const arrayBuffer = await state.searchFile.arrayBuffer();
+                const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
+                const opacity = state.watermarkOpacity / 100;
+                const pages = pdfDoc.getPages();
+
+                let drawFn;
+                if (typeValue.startsWith('text:')) {
+                    const text = typeValue.slice(5);
+                    const font = await pdfDoc.embedFont(PDFLib.StandardFonts.HelveticaBold);
+                    drawFn = (page, x, y, fontSize) => {
+                        page.drawText(text, {
+                            x, y,
+                            size: fontSize,
+                            font,
+                            color: PDFLib.rgb(0.5, 0.5, 0.5),
+                            opacity,
+                            rotate: PDFLib.degrees(-30)
+                        });
+                    };
+                } else if (typeValue === 'image:uploaded' && state.watermarkImageData) {
+                    const img = state.watermarkImageData.mime === 'image/png'
+                        ? await pdfDoc.embedPng(state.watermarkImageData.bytes)
+                        : await pdfDoc.embedJpg(state.watermarkImageData.bytes);
+                    drawFn = (page, x, y, size) => {
+                        page.drawImage(img, { x, y, width: size, height: size, opacity, rotate: PDFLib.degrees(-30) });
+                    };
+                } else {
+                    showSearchStatus('error', '⚠️ 請先上傳校徽 PNG');
+                    return;
+                }
+
+                for (const page of pages) {
+                    const { width, height } = page.getSize();
+                    const stepX = typeValue.startsWith('text:') ? 200 : 150;
+                    const stepY = 120;
+                    const fontOrImgSize = typeValue.startsWith('text:') ? 36 : 80;
+                    for (let y = -50; y < height + 50; y += stepY) {
+                        for (let x = -100; x < width + 100; x += stepX) {
+                            drawFn(page, x, y, fontOrImgSize);
+                        }
+                    }
+                }
+
+                const bytes = await pdfDoc.save();
+                const filename = (document.getElementById('watermark-output-filename').value.trim() || 'watermarked') + '.pdf';
+                downloadBlob(bytes, filename, 'application/pdf');
+                showSearchStatus('info', `✅ 浮水印套用完成，已下載 ${filename}`);
+            } catch (err) {
+                console.error(err);
+                showSearchStatus('error', `❌ 浮水印失敗：${err.message}`);
+            }
+        }
+
+        // ── Redaction mode (v3.0b — L1 visual overlay + L2 text removal) ──
+        function updateRedactionButton() {
+            const btn = document.getElementById('redaction-execute');
+            const keywords = state.redactionKeywords.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+            btn.disabled = !(state.searchFile && keywords.length > 0);
+        }
+
+        document.getElementById('redaction-execute').addEventListener('click', applyRedaction);
+
+        async function applyRedaction() {
+            if (!state.searchFile) return;
+            const keywords = state.redactionKeywords.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+            if (!keywords.length) return;
+
+            // Confirmation dialog — this is the critical safety step
+            const confirmed = confirm(
+                `⚠️ 脫敏確認\n\n` +
+                `將遮罩 ${keywords.length} 個關鍵字喺 PDF 入面出現嘅位置。\n\n` +
+                `處理範圍：\n` +
+                `• 視覺遮罩：黑色 rectangle 完全覆蓋關鍵字位置\n` +
+                `• 文字移除：喺 PDF 內容流入面 comment out 對應文字操作員\n\n` +
+                `⚠️ 此操作不可逆。執行後請以 Adobe Reader 開啟確認所有關鍵字已被遮罩。\n\n` +
+                `確認執行？`
+            );
+            if (!confirmed) return;
+
+            showSearchStatus('info', '⏳ 執行脫敏中...');
+
+            try {
+                // Step 1: PDF.js text index to find keyword positions per page
+                const arrayBuffer = await state.searchFile.arrayBuffer();
+                const pdfjsDoc = await pdfjsLib.getDocument({ data: arrayBuffer.slice(0) }).promise;
+                const matchesByPage = {}; // { pageNum: [{x, y, width, height}] }
+
+                for (let pageNum = 1; pageNum <= pdfjsDoc.numPages; pageNum++) {
+                    const page = await pdfjsDoc.getPage(pageNum);
+                    const textContent = await page.getTextContent();
+                    const viewport = page.getViewport({ scale: 1.0 });
+                    matchesByPage[pageNum] = [];
+
+                    // Build a flat character-indexed string with positions per character
+                    const items = textContent.items;
+                    let fullText = '';
+                    const charMap = []; // index in fullText → { itemIndex, charIndexInItem }
+                    for (let i = 0; i < items.length; i++) {
+                        const itemStr = items[i].str;
+                        for (let c = 0; c < itemStr.length; c++) {
+                            charMap.push({ itemIndex: i, charIndexInItem: c });
+                            fullText += itemStr[c];
+                        }
+                        // Pad with space between items for word boundary matching
+                        fullText += ' ';
+                        charMap.push({ itemIndex: -1, charIndexInItem: -1 });
+                    }
+
+                    for (const keyword of keywords) {
+                        if (!keyword) continue;
+                        const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                        const regex = new RegExp(escaped, 'g');
+                        let m;
+                        while ((m = regex.exec(fullText)) !== null) {
+                            const startChar = m.index;
+                            const endChar = m.index + keyword.length - 1;
+                            if (startChar >= charMap.length) continue;
+                            const startInfo = charMap[startChar];
+                            const endInfo = charMap[endChar];
+                            if (!startInfo || !endInfo || startInfo.itemIndex < 0 || endInfo.itemIndex < 0) continue;
+
+                            // Compute PDF.js coordinate bounding box covering all items in range
+                            const startItem = items[startInfo.itemIndex];
+                            const endItem = items[endInfo.itemIndex];
+                            if (!startItem.transform || !endItem.transform) continue;
+
+                            const startX = startItem.transform[4];
+                            const startY = startItem.transform[5];
+                            const endX = endItem.transform[4] + (endItem.width || 0);
+                            const endY = endItem.transform[5] + (endItem.height || startItem.height || 10);
+
+                            const minX = Math.min(startX, endX);
+                            const maxX = Math.max(startX, endX);
+                            const minY = Math.min(startY, endY);
+                            const maxY = Math.max(startY, endY);
+
+                            // PDF.js item.transform[5] is already PDF user space Y (bottom-left origin),
+                            // matching pdf-lib's drawRectangle coordinate system. No flip needed.
+                            const pdfX = minX - 1;
+                            const pdfY = minY - 1;
+                            const pdfWidth = maxX - minX + 2;
+                            const pdfHeight = maxY - minY + 2;
+
+                            matchesByPage[pageNum].push({
+                                x: pdfX - 1, y: pdfY - 1,
+                                width: pdfWidth, height: pdfHeight
+                            });
+                        }
+                    }
+
+                    if (pageNum % 5 === 0 || pageNum === pdfjsDoc.numPages) {
+                        showSearchStatus('info', `⏳ 分析中... ${pageNum}/${pdfjsDoc.numPages} 頁`);
+                        await new Promise(r => setTimeout(r, 0));
+                    }
+                }
+
+                // Step 2: pdf-lib load + draw black rectangles + comment out Tj operators
+                const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
+                const pdfLibPages = pdfDoc.getPages();
+                let totalRedacted = 0;
+                let totalL2Removed = 0;
+
+                for (let i = 0; i < pdfLibPages.length; i++) {
+                    const page = pdfLibPages[i];
+                    const pageNum = i + 1;
+                    const matches = matchesByPage[pageNum] || [];
+                    if (!matches.length) continue;
+
+                    // L1: Visual black rectangles
+                    for (const m of matches) {
+                        page.drawRectangle({
+                            x: m.x, y: m.y, width: m.width, height: m.height,
+                            color: PDFLib.rgb(0, 0, 0),
+                            opacity: 1
+                        });
+                    }
+                    totalRedacted += matches.length;
+
+                    // L2: Stream edit — comment out text operators containing keywords
+                    try {
+                        const contentStream = page.node.Contents();
+                        if (contentStream) {
+                            const streams = contentStream.asArray ? contentStream.asArray() : [contentStream];
+                            for (const stream of streams) {
+                                const rawStream = stream.getContentsString ? stream.getContentsString() : null;
+                                if (!rawStream) continue;
+                                let modified = rawStream;
+                                for (const keyword of keywords) {
+                                    if (!keyword) continue;
+                                    // Match Tj operators containing the keyword: (text) Tj
+                                    // And TJ arrays containing the keyword
+                                    const escapedForText = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                                    const tjPattern = new RegExp(`\\(([^)]*${escapedForText}[^)]*)\\) Tj`, 'g');
+                                    const before = modified;
+                                    modified = modified.replace(tjPattern, '% REDACTED: $&');
+                                    if (modified !== before) totalL2Removed++;
+                                }
+                                if (modified !== rawStream) {
+                                    // Re-write content stream
+                                    const { PDFRawStream } = PDFLib;
+                                    stream.setContents ? stream.setContents(modified) : null;
+                                }
+                            }
+                        }
+                    } catch (streamErr) {
+                        console.warn('L2 stream edit failed for page', pageNum, streamErr);
+                    }
+                }
+
+                const bytes = await pdfDoc.save();
+                const filename = (document.getElementById('redaction-output-filename').value.trim() || 'redacted') + '.pdf';
+                downloadBlob(bytes, filename, 'application/pdf');
+                const l2Note = totalL2Removed > 0 ? `（含 ${totalL2Removed} 個內容流 operator 已標記）` : '（L2 內容流編輯因 PDF 結構未能套用,僅視覺遮罩）';
+                showSearchStatus('info', `✅ 脫敏完成：${totalRedacted} 個位置已遮罩 ${l2Note}。已下載 ${filename}。請用 Adobe Reader 確認。`);
+            } catch (err) {
+                console.error(err);
+                showSearchStatus('error', `❌ 脫敏失敗：${err.message}`);
+            }
         }
 
         setupDropzone('merge-dropzone', 'merge-input', (files) => {
@@ -1531,6 +1854,10 @@
                 searchCaseSensitive: document.getElementById('search-case-sensitive')?.checked ?? false,
                 searchWholeWord: document.getElementById('search-whole-word')?.checked ?? false,
                 redactionKeywords: document.getElementById('redaction-keywords')?.value || '',
+                redactionOutputFilename: document.getElementById('redaction-output-filename')?.value || 'redacted',
+                watermarkType: document.getElementById('watermark-type')?.value || '',
+                watermarkOpacity: parseInt(document.getElementById('watermark-opacity')?.value || '15', 10),
+                watermarkOutputFilename: document.getElementById('watermark-output-filename')?.value || 'watermarked',
                 savedAt: Date.now()
             };
             try {
@@ -1568,8 +1895,28 @@
                 document.getElementById('redaction-keywords').value = meta.redactionKeywords;
                 state.redactionKeywords = meta.redactionKeywords;
             }
+            if (meta.redactionOutputFilename) {
+                document.getElementById('redaction-output-filename').value = meta.redactionOutputFilename;
+            }
+            if (meta.watermarkType !== undefined) {
+                document.getElementById('watermark-type').value = meta.watermarkType;
+                state.watermarkType = meta.watermarkType;
+                if (meta.watermarkType === 'image:uploaded') {
+                    document.getElementById('watermark-upload-row').classList.remove('hidden');
+                }
+            }
+            if (meta.watermarkOpacity !== undefined) {
+                document.getElementById('watermark-opacity').value = meta.watermarkOpacity;
+                state.watermarkOpacity = meta.watermarkOpacity;
+                document.getElementById('watermark-opacity-display').textContent = `${meta.watermarkOpacity}%`;
+            }
+            if (meta.watermarkOutputFilename) {
+                document.getElementById('watermark-output-filename').value = meta.watermarkOutputFilename;
+            }
             updateSearchButton();
             updateRedactionKeywordCount();
+            updateWatermarkButton();
+            updateRedactionButton();
         }
 
         function restoreActiveTab(mode) {
@@ -1623,6 +1970,8 @@
                 if (state.searchFile) {
                     updateSearchFilename();
                     updateSearchButton();
+                    updateWatermarkButton();
+                    updateRedactionButton();
                 }
             }
 
@@ -1697,6 +2046,8 @@
                 clearSearchResults();
                 document.getElementById('search-status').classList.add('hidden');
                 updateSearchButton();
+                updateWatermarkButton();
+                updateRedactionButton();
                 localStorage.removeItem(LS_META_KEY);
                 banner.remove();
             });
