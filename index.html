@@ -29,6 +29,12 @@
         .mode-convert { background-color: #0284c7; }
         .mode-batch { background-color: #d97706; }
         .mode-image { background-color: #e11d48; }
+        .mode-search { background-color: #7c3aed; }
+        .search-highlight { background-color: #fef08a; padding: 0 2px; border-radius: 2px; }
+        body.dark .search-highlight { background-color: #facc15; color: #1f2937; }
+        .match-row { border-left: 3px solid transparent; transition: all 0.2s; }
+        .match-row:hover { border-left-color: #7c3aed; background-color: rgba(124, 58, 237, 0.04); }
+        body.dark .match-row:hover { background-color: rgba(124, 58, 237, 0.12); }
 
         /* ── Dark mode ── */
         :root {
@@ -97,6 +103,9 @@
             </button>
             <button class="tab-btn flex-1 min-w-[7rem] py-3 px-4 text-center font-medium text-rose-600 hover:bg-rose-50 transition whitespace-nowrap" data-mode="image">
                 🖼️ 圖片轉 PDF
+            </button>
+            <button class="tab-btn flex-1 min-w-[7rem] py-3 px-4 text-center font-medium text-violet-600 hover:bg-violet-50 transition whitespace-nowrap" data-mode="search">
+                🔍 搜尋與脫敏
             </button>
         </nav>
 
@@ -298,6 +307,68 @@
                     </button>
                 </div>
             </section>
+
+            <section id="mode-search" class="mode-panel hidden bg-white rounded-xl shadow-lg p-6">
+                <h2 class="text-xl font-bold text-violet-700 mb-4">🔍 搜尋與脫敏</h2>
+                <p class="text-gray-600 mb-4">上傳 PDF，用關鍵字搜尋內容（內嵌文字層），或準備脫敏關鍵字清單（v3.0b 將加入浮水印）。</p>
+
+                <div class="grid md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">📄 PDF 檔案</label>
+                        <div id="search-dropzone" class="dropzone rounded-xl p-6 text-center cursor-pointer">
+                            <div class="text-3xl mb-2">📄</div>
+                            <p class="text-gray-600 text-sm">拖曳 PDF 到此處，或點擊上傳（單檔）</p>
+                            <input type="file" id="search-input" accept=".pdf" class="hidden">
+                        </div>
+                        <p id="search-filename-display" class="text-xs text-gray-500 mt-2 truncate"></p>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">🔎 搜尋關鍵字</label>
+                        <input type="text" id="search-keyword" placeholder="例：陳小明 / 2024-IEP / 過敏" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mb-2">
+                        <div class="flex gap-2">
+                            <label class="flex items-center gap-2 text-sm text-gray-700">
+                                <input type="checkbox" id="search-case-sensitive" class="w-4 h-4 rounded">
+                                <span>區分大小寫</span>
+                            </label>
+                            <label class="flex items-center gap-2 text-sm text-gray-700">
+                                <input type="checkbox" id="search-whole-word" class="w-4 h-4 rounded">
+                                <span>全字匹配</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex gap-3 mb-4">
+                    <button id="search-execute" class="flex-1 py-3 bg-violet-600 text-white font-bold rounded-lg hover:bg-violet-700 transition disabled:bg-gray-300 disabled:cursor-not-allowed" disabled>
+                        🔍 開始搜尋
+                    </button>
+                    <button id="search-clear" class="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition">
+                        🗑️ 清空
+                    </button>
+                </div>
+
+                <div id="search-status" class="hidden mb-4 p-3 rounded-lg text-sm"></div>
+
+                <div id="search-results-summary" class="hidden mb-4 p-3 bg-violet-50 border border-violet-200 rounded-lg text-sm">
+                    <strong>📊 結果：</strong><span id="search-summary-text"></span>
+                </div>
+
+                <div id="search-results" class="space-y-2 mb-6"></div>
+
+                <div class="border-t border-gray-200 pt-6 mt-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-2">🔒 脫敏關鍵字清單（v3.0b 將整合脫敏流程）</h3>
+                    <p class="text-sm text-gray-600 mb-3">準備要遮罩嘅詞彙，例如學生姓名、學號、家長電話。v3.0a 只記錄；正式脫敏將於 v3.0b 啟用。</p>
+                    <textarea id="redaction-keywords" rows="4" placeholder="一行一個關鍵字：&#10;陳小明&#10;李大文&#10;A123456(7)&#10;9123-4567" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono mb-2"></textarea>
+                    <div class="flex gap-3 items-center">
+                        <label class="flex items-center gap-2 text-sm text-gray-700">
+                            <input type="file" id="redaction-keywords-file" accept=".txt,.csv" class="text-sm">
+                            <span class="text-gray-500">或上傳 .txt / .csv 關鍵字清單</span>
+                        </label>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-2" id="redaction-keyword-count">0 個關鍵字</p>
+                </div>
+            </section>
         </main>
 
         <footer class="text-center text-gray-500 text-sm mt-8">
@@ -319,7 +390,13 @@
             splitPages: [],
             convertFiles: [],
             batchFiles: [],
-            imageFiles: []
+            imageFiles: [],
+            searchFile: null,
+            searchKeyword: '',
+            searchCaseSensitive: false,
+            searchWholeWord: false,
+            searchResults: null,
+            redactionKeywords: ''
         };
 
         function naturalSort(files) {
@@ -410,6 +487,224 @@
                 document.getElementById(`mode-${btn.dataset.mode}`).classList.remove('hidden');
             });
         });
+
+        // ── Search & Redaction mode (v3.0a) ──
+        function updateSearchButton() {
+            const btn = document.getElementById('search-execute');
+            const keyword = document.getElementById('search-keyword').value.trim();
+            const enabled = state.searchFile && keyword.length > 0;
+            btn.disabled = !enabled;
+        }
+
+        function updateSearchFilename() {
+            const display = document.getElementById('search-filename-display');
+            if (state.searchFile) {
+                display.textContent = `📎 ${state.searchFile.name} (${(state.searchFile.size / 1024).toFixed(1)} KB)`;
+                display.classList.remove('hidden');
+            } else {
+                display.textContent = '';
+            }
+        }
+
+        function updateRedactionKeywordCount() {
+            const ta = document.getElementById('redaction-keywords');
+            state.redactionKeywords = ta.value;
+            const lines = ta.value.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+            document.getElementById('redaction-keyword-count').textContent = `${lines.length} 個關鍵字`;
+        }
+
+        function showSearchStatus(type, message) {
+            const el = document.getElementById('search-status');
+            el.classList.remove('hidden', 'bg-red-100', 'text-red-800', 'bg-amber-100', 'text-amber-800', 'bg-violet-100', 'text-violet-800');
+            if (type === 'error') {
+                el.classList.add('bg-red-100', 'text-red-800');
+            } else if (type === 'warn') {
+                el.classList.add('bg-amber-100', 'text-amber-800');
+            } else {
+                el.classList.add('bg-violet-100', 'text-violet-800');
+            }
+            el.textContent = message;
+        }
+
+        function clearSearchResults() {
+            state.searchResults = null;
+            document.getElementById('search-results').innerHTML = '';
+            document.getElementById('search-results-summary').classList.add('hidden');
+        }
+
+        setupDropzone('search-dropzone', 'search-input', (files) => {
+            if (!files.length) return;
+            const pdf = files.find(f => f.type === 'application/pdf');
+            if (!pdf) {
+                showSearchStatus('error', '⚠️ 請上傳 PDF 檔案');
+                return;
+            }
+            state.searchFile = pdf;
+            updateSearchFilename();
+            updateSearchButton();
+            clearSearchResults();
+            document.getElementById('search-status').classList.add('hidden');
+        });
+
+        document.getElementById('search-keyword').addEventListener('input', (e) => {
+            state.searchKeyword = e.target.value;
+            updateSearchButton();
+        });
+
+        document.getElementById('search-case-sensitive').addEventListener('change', (e) => {
+            state.searchCaseSensitive = e.target.checked;
+        });
+
+        document.getElementById('search-whole-word').addEventListener('change', (e) => {
+            state.searchWholeWord = e.target.checked;
+        });
+
+        document.getElementById('search-clear').addEventListener('click', () => {
+            state.searchFile = null;
+            state.searchKeyword = '';
+            state.searchResults = null;
+            document.getElementById('search-keyword').value = '';
+            document.getElementById('search-filename-display').textContent = '';
+            updateSearchButton();
+            clearSearchResults();
+            document.getElementById('search-status').classList.add('hidden');
+        });
+
+        document.getElementById('redaction-keywords').addEventListener('input', updateRedactionKeywordCount);
+
+        document.getElementById('redaction-keywords-file').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            try {
+                const text = await file.text();
+                const ta = document.getElementById('redaction-keywords');
+                ta.value = text;
+                updateRedactionKeywordCount();
+            } catch (err) {
+                showSearchStatus('error', `⚠️ 讀取關鍵字檔失敗：${err.message}`);
+            }
+            e.target.value = '';
+        });
+
+        document.getElementById('search-execute').addEventListener('click', runSearch);
+
+        async function runSearch() {
+            const keyword = document.getElementById('search-keyword').value.trim();
+            if (!state.searchFile || !keyword) return;
+
+            showSearchStatus('info', `⏳ 正在讀取 PDF 文字層...`);
+            document.getElementById('search-execute').disabled = true;
+
+            try {
+                const arrayBuffer = await state.searchFile.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                const numPages = pdf.numPages;
+                const caseSensitive = state.searchCaseSensitive;
+                const wholeWord = state.searchWholeWord;
+
+                const results = [];
+                let scannedPages = 0;
+                let scannedWithoutText = 0;
+                const contextRadius = 40;
+
+                for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+                    const page = await pdf.getPage(pageNum);
+                    const textContent = await page.getTextContent();
+                    const items = textContent.items;
+                    if (items.length === 0) {
+                        scannedWithoutText++;
+                        continue;
+                    }
+                    const pageText = items.map(it => it.str).join(' ');
+                    if (!pageText.trim()) {
+                        scannedWithoutText++;
+                        continue;
+                    }
+
+                    const haystack = caseSensitive ? pageText : pageText.toLowerCase();
+                    const needle = caseSensitive ? keyword : keyword.toLowerCase();
+                    const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const patternStr = wholeWord ? `\\b${escaped}\\b` : escaped;
+                    const regex = new RegExp(patternStr, 'g');
+
+                    let match;
+                    while ((match = regex.exec(haystack)) !== null) {
+                        const start = Math.max(0, match.index - contextRadius);
+                        const end = Math.min(pageText.length, match.index + needle.length + contextRadius);
+                        const before = pageText.substring(start, match.index);
+                        const found = pageText.substring(match.index, match.index + needle.length);
+                        const after = pageText.substring(match.index + needle.length, end);
+                        results.push({
+                            pageNum,
+                            before,
+                            found,
+                            after,
+                            absoluteIndex: match.index
+                        });
+                    }
+
+                    scannedPages++;
+                    if (scannedPages % 5 === 0 || pageNum === numPages) {
+                        showSearchStatus('info', `⏳ 掃描中... ${pageNum}/${numPages} 頁`);
+                        await new Promise(r => setTimeout(r, 0));
+                    }
+                }
+
+                state.searchResults = { keyword, results, scannedPages, scannedWithoutText, totalPages: numPages };
+
+                const summary = document.getElementById('search-results-summary');
+                const summaryText = document.getElementById('search-summary-text');
+                summary.classList.remove('hidden');
+
+                if (results.length === 0) {
+                    if (scannedWithoutText === numPages) {
+                        summaryText.innerHTML = `❌ 冇搵到「<strong>${escapeHtml(keyword)}</strong>」。<br>📷 此 PDF 嘅所有 ${numPages} 頁都冇內嵌文字層（可能係掃描檔），需要 OCR 先可以搜尋。v3.0b 將加入 Tesseract.js 本地 OCR。`;
+                        showSearchStatus('warn', `⚠️ 所有 ${numPages} 頁都冇內嵌文字層，疑似掃描檔。v3.0b 將加入本地 OCR。`);
+                    } else {
+                        summaryText.innerHTML = `❌ 喺 ${scannedPages} 個有文字嘅頁面入面冇搵到「<strong>${escapeHtml(keyword)}</strong>」。`;
+                        if (scannedWithoutText > 0) {
+                            summaryText.innerHTML += `<br>💡 提示：另有 ${scannedWithoutText} 頁冇文字層（可能係圖片頁）。`;
+                        }
+                        showSearchStatus('info', `ℹ️ 搜尋完成，${scannedPages} 個有文字嘅頁面入面冇匹配。`);
+                    }
+                    document.getElementById('search-results').innerHTML = '';
+                } else {
+                    const pagesWithMatch = new Set(results.map(r => r.pageNum)).size;
+                    summaryText.innerHTML = `✅ 搵到 <strong>${results.length}</strong> 個匹配，分佈喺 <strong>${pagesWithMatch}</strong> / ${numPages} 頁。`;
+                    showSearchStatus('info', `✅ 完成：${results.length} 個匹配，${pagesWithMatch} 頁。`);
+                    renderSearchResults(results);
+                }
+            } catch (err) {
+                console.error(err);
+                showSearchStatus('error', `❌ 搜尋失敗：${err.message}`);
+            } finally {
+                document.getElementById('search-execute').disabled = false;
+                updateSearchButton();
+            }
+        }
+
+        function escapeHtml(s) {
+            return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        }
+
+        function renderSearchResults(results) {
+            const container = document.getElementById('search-results');
+            container.innerHTML = '';
+            results.forEach((r, idx) => {
+                const row = document.createElement('div');
+                row.className = 'match-row bg-gray-50 rounded-lg p-3';
+                row.innerHTML = `
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="bg-violet-600 text-white text-xs font-bold px-2 py-0.5 rounded">第 ${r.pageNum} 頁</span>
+                        <span class="text-xs text-gray-500">匹配 #${idx + 1}</span>
+                    </div>
+                    <div class="text-sm text-gray-700 leading-relaxed">
+                        ${escapeHtml(r.before)}<mark class="search-highlight">${escapeHtml(r.found)}</mark>${escapeHtml(r.after)}
+                    </div>
+                `;
+                container.appendChild(row);
+            });
+        }
 
         setupDropzone('merge-dropzone', 'merge-input', (files) => {
             const pdfFiles = files.filter(f => f.type === 'application/pdf');
@@ -1205,6 +1500,11 @@
             await idbPut('batchFiles', state.batchFiles.map(serializeFile));
             await idbPut('convertFiles', state.convertFiles.map(serializeFile));
             await idbPut('imageFiles', state.imageFiles.map(serializeFile));
+            if (state.searchFile) {
+                await idbPut('searchFile', serializeFile(state.searchFile));
+            } else {
+                await idbPut('searchFile', null);
+            }
             if (state.splitFile) {
                 await idbPut('splitFile', serializeFile(state.splitFile));
                 await idbPut('splitPages', state.splitPages.map(p => ({
@@ -1227,6 +1527,10 @@
                 imageOutputMode: document.getElementById('image-output-mode')?.value || 'merged',
                 imagePaperSize: document.getElementById('image-paper-size')?.value || 'A4',
                 imageOrientation: document.getElementById('image-orientation')?.value || 'portrait',
+                searchKeyword: document.getElementById('search-keyword')?.value || '',
+                searchCaseSensitive: document.getElementById('search-case-sensitive')?.checked ?? false,
+                searchWholeWord: document.getElementById('search-whole-word')?.checked ?? false,
+                redactionKeywords: document.getElementById('redaction-keywords')?.value || '',
                 savedAt: Date.now()
             };
             try {
@@ -1246,6 +1550,26 @@
             if (meta.imageOutputMode) document.getElementById('image-output-mode').value = meta.imageOutputMode;
             if (meta.imagePaperSize) document.getElementById('image-paper-size').value = meta.imagePaperSize;
             if (meta.imageOrientation) document.getElementById('image-orientation').value = meta.imageOrientation;
+            if (meta.searchKeyword) {
+                document.getElementById('search-keyword').value = meta.searchKeyword;
+                state.searchKeyword = meta.searchKeyword;
+            }
+            const cs = document.getElementById('search-case-sensitive');
+            const ww = document.getElementById('search-whole-word');
+            if (cs && meta.searchCaseSensitive !== undefined) {
+                cs.checked = meta.searchCaseSensitive;
+                state.searchCaseSensitive = meta.searchCaseSensitive;
+            }
+            if (ww && meta.searchWholeWord !== undefined) {
+                ww.checked = meta.searchWholeWord;
+                state.searchWholeWord = meta.searchWholeWord;
+            }
+            if (meta.redactionKeywords) {
+                document.getElementById('redaction-keywords').value = meta.redactionKeywords;
+                state.redactionKeywords = meta.redactionKeywords;
+            }
+            updateSearchButton();
+            updateRedactionKeywordCount();
         }
 
         function restoreActiveTab(mode) {
@@ -1275,6 +1599,7 @@
             const imageRecs = await idbGet('imageFiles');
             const splitFileRec = await idbGet('splitFile');
             const splitPagesRec = await idbGet('splitPages');
+            const searchFileRec = await idbGet('searchFile');
 
             if (mergeRecs && mergeRecs.length) {
                 state.mergeFiles = mergeRecs.map(deserializeFile).filter(Boolean);
@@ -1291,6 +1616,14 @@
             if (imageRecs && imageRecs.length) {
                 state.imageFiles = imageRecs.map(deserializeFile).filter(Boolean);
                 updateImageList();
+            }
+
+            if (searchFileRec) {
+                state.searchFile = deserializeFile(searchFileRec);
+                if (state.searchFile) {
+                    updateSearchFilename();
+                    updateSearchButton();
+                }
             }
 
             if (splitFileRec) {
@@ -1323,7 +1656,8 @@
             // If anything was restored, show a banner so user knows
             const restored = (state.mergeFiles.length + state.batchFiles.length +
                               state.convertFiles.length + state.imageFiles.length +
-                              (state.splitFile ? 1 : 0)) > 0;
+                              (state.splitFile ? 1 : 0) +
+                              (state.searchFile ? 1 : 0)) > 0;
             if (restored) {
                 showRestoreBanner();
             }
@@ -1345,6 +1679,9 @@
                 state.imageFiles = [];
                 state.splitFile = null;
                 state.splitPages = [];
+                state.searchFile = null;
+                state.searchKeyword = '';
+                state.searchResults = null;
                 await idbClear();
                 updateMergeList();
                 updateBatchList();
@@ -1355,6 +1692,11 @@
                 document.getElementById('split-deselect-all').classList.add('hidden');
                 document.getElementById('split-extract').classList.add('hidden');
                 document.getElementById('split-zip').classList.add('hidden');
+                document.getElementById('search-filename-display').textContent = '';
+                document.getElementById('search-keyword').value = '';
+                clearSearchResults();
+                document.getElementById('search-status').classList.add('hidden');
+                updateSearchButton();
                 localStorage.removeItem(LS_META_KEY);
                 banner.remove();
             });
