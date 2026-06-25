@@ -11,8 +11,11 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.5.1/mammoth.browser.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js"></script>
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+        // Note: pdf-lib v1.x uses instance method pdfDoc.registerFontkit(fontkit).
+        // fontkit UMD is loaded as <script src="..."> above (sets window.fontkit).
     </script>
     <style>
         .tab-active { border-bottom: 3px solid currentColor; }
@@ -115,12 +118,20 @@
                             <option value="text:DO NOT COPY">DO NOT COPY</option>
                             <option value="text:NO_DIST">NO DISTRIBUTION</option>
                             <option value="text:SKIP">SKIP</option>
+                            <option value="text:校內文件">校內文件</option>
+                            <option value="text:機密">機密</option>
+                            <option value="text:草稿">草稿</option>
+                            <option value="text:正本">正本</option>
+                            <option value="text:副本">副本</option>
+                            <option value="text:內部傳閱">內部傳閱</option>
+                            <option value="text:請勿複印">請勿複印</option>
                             <option value="image:uploaded">🖼️ 校徽 PNG（支援中文）</option>
                         </select>
                     </div>
                     <div>
                         <label class="block text-xs text-gray-600 mb-1">🌫️ 透明度 <span id="global-watermark-opacity-display" class="font-bold">15%</span></label>
                         <input type="range" id="global-watermark-opacity" min="5" max="50" value="15" class="w-full">
+                        <p class="text-xs text-gray-500 mt-1">中文浮水印首次使用需下載 NotoSansTC 子集 (約 120KB),之後從 IndexedDB 緩存取用,零外流。罕見字可能顯示為 .notdef。</p>
                     </div>
                 </div>
                 <div id="global-watermark-upload-row" class="hidden mb-2">
@@ -434,6 +445,13 @@
                                 <option value="text:DO NOT COPY">DO NOT COPY（請勿複印）</option>
                                 <option value="text:NO_DIST">NO DISTRIBUTION</option>
                                 <option value="text:SKIP">SKIP（測試用）</option>
+                                <option value="text:校內文件">校內文件</option>
+                                <option value="text:機密">機密</option>
+                                <option value="text:草稿">草稿</option>
+                                <option value="text:正本">正本</option>
+                                <option value="text:副本">副本</option>
+                                <option value="text:內部傳閱">內部傳閱</option>
+                                <option value="text:請勿複印">請勿複印</option>
                                 <option value="image:uploaded">🖼️ 用戶上傳校徽 PNG（支援中文圖片）</option>
                             </select>
                         </div>
@@ -960,9 +978,41 @@
 
         document.getElementById('watermark-execute').addEventListener('click', applyWatermark);
 
+        // ── Chinese font loader (v3.0e) — NotoSansTC subset bundled in assets/ ──
+        // Strategy: IDB cache → fetch from same-origin ./assets/NotoSansTC-subset.otf → store in IDB
+        // Subset covers ~547 common CJK chars (education / admin vocabulary).
+        // Rare characters will fall back to .notdef glyphs — acceptable for watermark use case.
+        let _chineseFontBytes = null;
+        let _chineseFontLoading = null;
+        async function loadChineseFontBytes() {
+            if (_chineseFontBytes) return _chineseFontBytes;
+            if (_chineseFontLoading) return _chineseFontLoading;
+            // Try IDB cache first
+            const cached = await idbGet('chineseFontBytes');
+            if (cached && cached.bytes) {
+                _chineseFontBytes = cached.bytes;
+                return _chineseFontBytes;
+            }
+            // Fetch from same-origin (works for dev server + GitHub Pages)
+            _chineseFontLoading = (async () => {
+                const res = await fetch('./assets/NotoSansTC-subset.otf');
+                if (!res.ok) throw new Error(`Chinese font fetch failed: HTTP ${res.status}`);
+                const buf = await res.arrayBuffer();
+                await idbPut('chineseFontBytes', { bytes: buf, size: buf.byteLength });
+                _chineseFontBytes = buf;
+                return buf;
+            })();
+            return _chineseFontLoading;
+        }
+
+        // Heuristic: detect if string contains CJK characters (Unified Ideographs)
+        function hasCJKChar(s) {
+            return /[\u3400-\u9FFF\uF900-\uFAFF]/.test(s);
+        }
+
         // ── Shared watermark utility (v3.0d) — used by search mode + all 5 output modes ──
         // Returns Uint8Array of watermarked PDF. Throws on error.
-        // opts: { type: 'text:XXX' | 'image:uploaded', opacity: 0-1, imageBytes?, imageMime? }
+        // opts: { type: 'text:XXX' | 'image:uploaded', opacity: 0-100, imageBytes?, imageMime? }
         async function applyWatermarkToPdfBytes(pdfBytes, opts) {
             const pdfDoc = await PDFLib.PDFDocument.load(pdfBytes);
             const opacity = opts.opacity / 100;
@@ -971,7 +1021,20 @@
             let drawFn;
             if (opts.type.startsWith('text:')) {
                 const text = opts.type.slice(5);
-                const font = await pdfDoc.embedFont(PDFLib.StandardFonts.HelveticaBold);
+                const isCJK = hasCJKChar(text);
+                let font;
+                if (isCJK) {
+                    const fontBytes = await loadChineseFontBytes();
+                    // pdf-lib requires fontkit instance for custom font embedding
+                    if (typeof fontkit !== 'undefined') {
+                        pdfDoc.registerFontkit(fontkit);
+                    } else {
+                        throw new Error('Chinese font selected but fontkit library not loaded. 請檢查 CDN 連線或重新整理頁面。');
+                    }
+                    font = await pdfDoc.embedFont(fontBytes, { subset: true });
+                } else {
+                    font = await pdfDoc.embedFont(PDFLib.StandardFonts.HelveticaBold);
+                }
                 drawFn = (page, x, y, fontSize) => {
                     page.drawText(text, {
                         x, y,
@@ -995,7 +1058,8 @@
 
             for (const page of pages) {
                 const { width, height } = page.getSize();
-                const stepX = opts.type.startsWith('text:') ? 200 : 150;
+                // CJK chars are denser — wider spacing for readability
+                const stepX = opts.type.startsWith('text:') ? (hasCJKChar(opts.type.slice(5)) ? 240 : 200) : 150;
                 const stepY = 120;
                 const fontOrImgSize = opts.type.startsWith('text:') ? 36 : 80;
                 for (let y = -50; y < height + 50; y += stepY) {
@@ -1031,7 +1095,8 @@
             if (!state.searchFile) return;
             const typeValue = document.getElementById('watermark-type').value;
             if (!typeValue) return;
-            showSearchStatus('info', '⏳ 套用浮水印中...');
+            const isCJK = hasCJKChar(typeValue.slice(5));
+            showSearchStatus('info', isCJK ? '⏳ 首次使用中文浮水印：載入 NotoSansTC (~120KB)...' : '⏳ 套用浮水印中...');
 
             try {
                 const arrayBuffer = await state.searchFile.arrayBuffer();
@@ -1047,7 +1112,11 @@
                 showSearchStatus('info', `✅ 浮水印套用完成，已下載 ${filename}`);
             } catch (err) {
                 console.error(err);
-                showSearchStatus('error', `❌ 浮水印失敗：${err.message}`);
+                if (err.message?.includes('Chinese font fetch failed')) {
+                    showSearchStatus('error', `❌ 中文浮水印失敗：未能載入 NotoSansTC。請檢查 assets/NotoSansTC-subset.otf 是否存在,或改用英文浮水印。`);
+                } else {
+                    showSearchStatus('error', `❌ 浮水印失敗：${err.message}`);
+                }
             }
         }
 
@@ -1908,7 +1977,10 @@
             if (opts) {
                 const overlay = document.getElementById('loading-overlay');
                 const origText = document.getElementById('loading-text').textContent;
-                document.getElementById('loading-text').textContent = '正在套用浮水印...';
+                const isCJK = hasCJKChar(opts.type.slice(5));
+                document.getElementById('loading-text').textContent = isCJK
+                    ? '首次中文浮水印：載入 NotoSansTC 子集...'
+                    : '正在套用浮水印...';
                 overlay.classList.remove('hidden');
                 try {
                     bytes = await applyWatermarkToPdfBytes(bytes, opts);
