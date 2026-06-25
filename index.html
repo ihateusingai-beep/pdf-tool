@@ -75,6 +75,13 @@
         /* ── Large text mode ── */
         body.large-text { font-size: 150%; }
         body.large-text .container { max-width: 900px !important; }
+
+        /* ── Global watermark panel ── */
+        #global-watermark-panel { font-size: 0.85rem; }
+        #global-watermark-panel select, #global-watermark-panel input[type="range"] { font-size: 0.8rem; }
+        body.dark #global-watermark-panel { background-color: #2e1065; border-color: #6d28d9; color: #ede9fe; }
+        body.dark #global-watermark-panel select { background-color: var(--accent-bg); color: var(--text-primary); }
+        body.dark #global-watermark-panel select option { background-color: var(--bg-white); }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
@@ -85,9 +92,44 @@
                 <div class="flex gap-2 ml-4">
                     <button id="btn-dark" title="🌙 黑暗模式" class="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded-lg text-sm transition">🌙</button>
                     <button id="btn-large" title="🔤 大字模式" class="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded-lg text-sm transition">🔤</button>
+                    <button id="btn-global-watermark" title="🖼️ 全域浮水印" class="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded-lg text-sm transition">🖼️</button>
                 </div>
             </div>
             <p class="text-gray-600">100% 本地端處理 • 敏感資料零外流</p>
+
+            <div id="global-watermark-panel" class="hidden mt-3 mx-auto max-w-2xl bg-violet-50 border border-violet-200 rounded-xl p-4 text-left">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-sm font-bold text-violet-800">🖼️ 全域浮水印 — 自動套用於所有輸出</h3>
+                    <label class="flex items-center gap-2 text-xs">
+                        <input type="checkbox" id="global-watermark-enabled" class="w-4 h-4 rounded">
+                        <span class="text-violet-700">啟用</span>
+                    </label>
+                </div>
+                <div class="grid sm:grid-cols-2 gap-3 mb-2">
+                    <div>
+                        <label class="block text-xs text-gray-600 mb-1">📌 類型</label>
+                        <select id="global-watermark-type" class="w-full px-2 py-1.5 border border-gray-300 rounded text-sm">
+                            <option value="">— 無 —</option>
+                            <option value="text:DRAFT">DRAFT</option>
+                            <option value="text:CONFIDENTIAL">CONFIDENTIAL</option>
+                            <option value="text:DO NOT COPY">DO NOT COPY</option>
+                            <option value="text:NO_DIST">NO DISTRIBUTION</option>
+                            <option value="text:SKIP">SKIP</option>
+                            <option value="image:uploaded">🖼️ 校徽 PNG（支援中文）</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-600 mb-1">🌫️ 透明度 <span id="global-watermark-opacity-display" class="font-bold">15%</span></label>
+                        <input type="range" id="global-watermark-opacity" min="5" max="50" value="15" class="w-full">
+                    </div>
+                </div>
+                <div id="global-watermark-upload-row" class="hidden mb-2">
+                    <label class="block text-xs text-gray-600 mb-1">🖼️ 上傳校徽 PNG/JPG</label>
+                    <input type="file" id="global-watermark-image" accept="image/png,image/jpeg" class="text-xs">
+                    <p id="global-watermark-image-info" class="text-xs text-gray-500 mt-1"></p>
+                </div>
+                <p class="text-xs text-gray-500">啟用後,任何 mode 嘅輸出（合併/分割/批次/Word/圖片）都會自動加浮水印。執行時右上角會顯示「正在套用浮水印...」。</p>
+            </div>
         </header>
 
         <nav class="flex border-b border-gray-300 mb-6 overflow-x-auto whitespace-nowrap">
@@ -446,7 +488,12 @@
             watermarkType: '',
             watermarkOpacity: 15,
             watermarkImageData: null,  // { bytes, mime } for embedded PNG/JPEG
-            watermarkImageName: ''
+            watermarkImageName: '',
+            // Global watermark — applied automatically to all 5 output modes (v3.0d)
+            globalWatermarkEnabled: false,
+            globalWatermarkType: '',
+            globalWatermarkOpacity: 15,
+            globalWatermarkImageName: ''
         };
 
         function naturalSort(files) {
@@ -913,6 +960,73 @@
 
         document.getElementById('watermark-execute').addEventListener('click', applyWatermark);
 
+        // ── Shared watermark utility (v3.0d) — used by search mode + all 5 output modes ──
+        // Returns Uint8Array of watermarked PDF. Throws on error.
+        // opts: { type: 'text:XXX' | 'image:uploaded', opacity: 0-1, imageBytes?, imageMime? }
+        async function applyWatermarkToPdfBytes(pdfBytes, opts) {
+            const pdfDoc = await PDFLib.PDFDocument.load(pdfBytes);
+            const opacity = opts.opacity / 100;
+            const pages = pdfDoc.getPages();
+
+            let drawFn;
+            if (opts.type.startsWith('text:')) {
+                const text = opts.type.slice(5);
+                const font = await pdfDoc.embedFont(PDFLib.StandardFonts.HelveticaBold);
+                drawFn = (page, x, y, fontSize) => {
+                    page.drawText(text, {
+                        x, y,
+                        size: fontSize,
+                        font,
+                        color: PDFLib.rgb(0.5, 0.5, 0.5),
+                        opacity,
+                        rotate: PDFLib.degrees(-30)
+                    });
+                };
+            } else if (opts.type === 'image:uploaded' && opts.imageBytes) {
+                const img = opts.imageMime === 'image/png'
+                    ? await pdfDoc.embedPng(opts.imageBytes)
+                    : await pdfDoc.embedJpg(opts.imageBytes);
+                drawFn = (page, x, y, size) => {
+                    page.drawImage(img, { x, y, width: size, height: size, opacity, rotate: PDFLib.degrees(-30) });
+                };
+            } else {
+                throw new Error('請先選擇浮水印類型或上傳校徽 PNG');
+            }
+
+            for (const page of pages) {
+                const { width, height } = page.getSize();
+                const stepX = opts.type.startsWith('text:') ? 200 : 150;
+                const stepY = 120;
+                const fontOrImgSize = opts.type.startsWith('text:') ? 36 : 80;
+                for (let y = -50; y < height + 50; y += stepY) {
+                    for (let x = -100; x < width + 100; x += stepX) {
+                        drawFn(page, x, y, fontOrImgSize);
+                    }
+                }
+            }
+
+            return await pdfDoc.save();
+        }
+
+        // Helper: read global watermark state from root state + IndexedDB image cache
+        async function getGlobalWatermarkOpts() {
+            if (!state.globalWatermarkEnabled) return null;
+            const type = state.globalWatermarkType;
+            if (!type || type === '') return null;
+            if (type === 'image:uploaded') {
+                // Re-fetch image bytes from IndexedDB (loaded once at upload time)
+                const cached = await idbGet('watermarkImageData');
+                if (!cached) return null;
+                return {
+                    type,
+                    opacity: state.globalWatermarkOpacity,
+                    imageBytes: cached.bytes,
+                    imageMime: cached.mime
+                };
+            }
+            return { type, opacity: state.globalWatermarkOpacity };
+        }
+
         async function applyWatermark() {
             if (!state.searchFile) return;
             const typeValue = document.getElementById('watermark-type').value;
@@ -921,49 +1035,13 @@
 
             try {
                 const arrayBuffer = await state.searchFile.arrayBuffer();
-                const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
-                const opacity = state.watermarkOpacity / 100;
-                const pages = pdfDoc.getPages();
-
-                let drawFn;
-                if (typeValue.startsWith('text:')) {
-                    const text = typeValue.slice(5);
-                    const font = await pdfDoc.embedFont(PDFLib.StandardFonts.HelveticaBold);
-                    drawFn = (page, x, y, fontSize) => {
-                        page.drawText(text, {
-                            x, y,
-                            size: fontSize,
-                            font,
-                            color: PDFLib.rgb(0.5, 0.5, 0.5),
-                            opacity,
-                            rotate: PDFLib.degrees(-30)
-                        });
-                    };
-                } else if (typeValue === 'image:uploaded' && state.watermarkImageData) {
-                    const img = state.watermarkImageData.mime === 'image/png'
-                        ? await pdfDoc.embedPng(state.watermarkImageData.bytes)
-                        : await pdfDoc.embedJpg(state.watermarkImageData.bytes);
-                    drawFn = (page, x, y, size) => {
-                        page.drawImage(img, { x, y, width: size, height: size, opacity, rotate: PDFLib.degrees(-30) });
-                    };
-                } else {
-                    showSearchStatus('error', '⚠️ 請先上傳校徽 PNG');
-                    return;
-                }
-
-                for (const page of pages) {
-                    const { width, height } = page.getSize();
-                    const stepX = typeValue.startsWith('text:') ? 200 : 150;
-                    const stepY = 120;
-                    const fontOrImgSize = typeValue.startsWith('text:') ? 36 : 80;
-                    for (let y = -50; y < height + 50; y += stepY) {
-                        for (let x = -100; x < width + 100; x += stepX) {
-                            drawFn(page, x, y, fontOrImgSize);
-                        }
-                    }
-                }
-
-                const bytes = await pdfDoc.save();
+                const opts = {
+                    type: typeValue,
+                    opacity: state.watermarkOpacity,
+                    imageBytes: state.watermarkImageData?.bytes,
+                    imageMime: state.watermarkImageData?.mime
+                };
+                const bytes = await applyWatermarkToPdfBytes(arrayBuffer, opts);
                 const filename = (document.getElementById('watermark-output-filename').value.trim() || 'watermarked') + '.pdf';
                 downloadBlob(bytes, filename, 'application/pdf');
                 showSearchStatus('info', `✅ 浮水印套用完成，已下載 ${filename}`);
@@ -1120,6 +1198,39 @@
             }
         }
 
+        // ── Global watermark panel (v3.0d) — auto-applies to all 5 output modes ──
+        document.getElementById('btn-global-watermark').addEventListener('click', () => {
+            const panel = document.getElementById('global-watermark-panel');
+            panel.classList.toggle('hidden');
+        });
+
+        document.getElementById('global-watermark-enabled').addEventListener('change', (e) => {
+            state.globalWatermarkEnabled = e.target.checked;
+        });
+
+        document.getElementById('global-watermark-type').addEventListener('change', (e) => {
+            state.globalWatermarkType = e.target.value;
+            const uploadRow = document.getElementById('global-watermark-upload-row');
+            if (e.target.value === 'image:uploaded') uploadRow.classList.remove('hidden');
+            else uploadRow.classList.add('hidden');
+        });
+
+        document.getElementById('global-watermark-opacity').addEventListener('input', (e) => {
+            state.globalWatermarkOpacity = parseInt(e.target.value, 10);
+            document.getElementById('global-watermark-opacity-display').textContent = `${state.globalWatermarkOpacity}%`;
+        });
+
+        document.getElementById('global-watermark-image').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const buf = await file.arrayBuffer();
+            state.globalWatermarkImageName = file.name;
+            document.getElementById('global-watermark-image-info').textContent = `📎 ${file.name} (${(file.size / 1024).toFixed(1)} KB) — 已快取`;
+            // Cache blob bytes in IndexedDB so applyGlobalWatermark can re-use across page reload
+            await idbPut('watermarkImageData', { bytes: buf, mime: file.type, name: file.name });
+            e.target.value = '';
+        });
+
         setupDropzone('merge-dropzone', 'merge-input', (files) => {
             const pdfFiles = files.filter(f => f.type === 'application/pdf');
             state.mergeFiles = naturalSort([...state.mergeFiles, ...pdfFiles]);
@@ -1214,13 +1325,7 @@
                     pdfBytes = await mergedPdf.save({ useObjectStreams: true });
                 }
 
-                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = filename + '.pdf';
-                a.click();
-                URL.revokeObjectURL(url);
+                await downloadPdfWithWatermark(pdfBytes, filename + '.pdf');
             } catch (err) {
                 alert('合併失敗：' + err.message);
             }
@@ -1289,13 +1394,7 @@
                 }
 
                 const pdfBytes = await newPdf.save();
-                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = (document.getElementById('split-filename').value.trim() || 'extracted') + '.pdf';
-                a.click();
-                URL.revokeObjectURL(url);
+                await downloadPdfWithWatermark(pdfBytes, (document.getElementById('split-filename').value.trim() || 'extracted') + '.pdf');
             } catch (err) {
                 alert('擷取失敗：' + err.message);
             }
@@ -1312,11 +1411,15 @@
                 const template = document.getElementById('split-filename').value.trim() || 'page_{n}';
                 const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
 
+                const watermarkOpts = await getGlobalWatermarkOpts();
                 for (const pageNum of selectedPages) {
                     const newPdf = await PDFLib.PDFDocument.create();
                     const [page] = await newPdf.copyPages(pdf, [pageNum - 1]);
                     newPdf.addPage(page);
-                    const pdfBytes = await newPdf.save();
+                    let pdfBytes = await newPdf.save();
+                    if (watermarkOpts) {
+                        try { pdfBytes = await applyWatermarkToPdfBytes(pdfBytes, watermarkOpts); } catch (e) { console.warn('zip watermark failed', e); }
+                    }
                     const name = template.replace('{n}', pageNum).replace('{date}', today) + '.pdf';
                     zip.file(name, pdfBytes);
                 }
@@ -1463,6 +1566,7 @@
             try {
                 const addPageNumbers = document.getElementById('batch-page-numbers').checked;
                 const addBlankPage = document.getElementById('batch-blank-page').checked;
+                const watermarkOpts = await getGlobalWatermarkOpts();
                 const zip = new JSZip();
                 const total = state.batchFiles.length;
 
@@ -1495,10 +1599,16 @@
                                 processedPdf.addPage([595.36, 841.68]);
                             }
                         }
-                        const pdfBytes = await processedPdf.save();
+                        let pdfBytes = await processedPdf.save();
+                        if (watermarkOpts) {
+                            try { pdfBytes = await applyWatermarkToPdfBytes(pdfBytes, watermarkOpts); } catch (e) { console.warn('batch zip watermark failed', e); }
+                        }
                         zip.file(file.name, pdfBytes);
                     } else {
-                        const pdfBytes = await pdf.save();
+                        let pdfBytes = await pdf.save();
+                        if (watermarkOpts) {
+                            try { pdfBytes = await applyWatermarkToPdfBytes(pdfBytes, watermarkOpts); } catch (e) { console.warn('batch zip watermark failed', e); }
+                        }
                         zip.file(file.name, pdfBytes);
                     }
                 }
@@ -1723,10 +1833,11 @@
                         catch (e) { alert('⚠️ 此瀏覽器模式不支援 PDF 加密，將輸出未加密版本。'); }
                     }
                     const pdfBytes = await mergedPdf.save({ useObjectStreams: true });
-                    downloadBlob(pdfBytes, baseFilename + '.pdf', 'application/pdf');
+                    await downloadPdfWithWatermark(pdfBytes, baseFilename + '.pdf');
                     if (errors.length) alert(`⚠️ 以下 ${errors.length} 張失敗，已略過：\n${errors.join('\n')}`);
                 } else {
                     // ZIP mode: each image → its own 1-page PDF
+                    const watermarkOpts = await getGlobalWatermarkOpts();
                     const zip = new JSZip();
                     for (let i = 0; i < state.imageFiles.length; i++) {
                         const file = state.imageFiles[i];
@@ -1758,7 +1869,10 @@
                                 width: drawW,
                                 height: drawH
                             });
-                            const pdfBytes = await subPdf.save({ useObjectStreams: true });
+                            let pdfBytes = await subPdf.save({ useObjectStreams: true });
+                            if (watermarkOpts) {
+                                try { pdfBytes = await applyWatermarkToPdfBytes(pdfBytes, watermarkOpts); } catch (e) { console.warn('image zip watermark failed', e); }
+                            }
                             const stem = sanitizeFilename(file.name.replace(/\.[^.]+$/, ''));
                             const entryName = `${stem}.pdf`;
                             zip.file(entryName, pdfBytes);
@@ -1785,6 +1899,28 @@
             a.download = filename;
             a.click();
             URL.revokeObjectURL(url);
+        }
+
+        // Apply global watermark (if enabled) then download as PDF.
+        // Used by all 5 output modes so users can configure watermark once.
+        async function downloadPdfWithWatermark(bytes, filename) {
+            const opts = await getGlobalWatermarkOpts();
+            if (opts) {
+                const overlay = document.getElementById('loading-overlay');
+                const origText = document.getElementById('loading-text').textContent;
+                document.getElementById('loading-text').textContent = '正在套用浮水印...';
+                overlay.classList.remove('hidden');
+                try {
+                    bytes = await applyWatermarkToPdfBytes(bytes, opts);
+                } catch (e) {
+                    console.error('Global watermark failed:', e);
+                    // Continue with original bytes — better than failing the whole operation
+                } finally {
+                    overlay.classList.add('hidden');
+                    document.getElementById('loading-text').textContent = origText;
+                }
+            }
+            downloadBlob(bytes, filename, 'application/pdf');
         }
 
         document.addEventListener('dragover', (e) => e.preventDefault());
@@ -1949,6 +2085,9 @@
                 watermarkType: document.getElementById('watermark-type')?.value || '',
                 watermarkOpacity: parseInt(document.getElementById('watermark-opacity')?.value || '15', 10),
                 watermarkOutputFilename: document.getElementById('watermark-output-filename')?.value || 'watermarked',
+                globalWatermarkEnabled: document.getElementById('global-watermark-enabled')?.checked ?? false,
+                globalWatermarkType: document.getElementById('global-watermark-type')?.value || '',
+                globalWatermarkOpacity: parseInt(document.getElementById('global-watermark-opacity')?.value || '15', 10),
                 savedAt: Date.now()
             };
             try {
@@ -1956,7 +2095,7 @@
             } catch {}
         }
 
-        function restoreFilenameInputs(meta) {
+        async function restoreFilenameInputs(meta) {
             if (meta.mergeFilename) document.getElementById('merge-filename').value = meta.mergeFilename;
             if (meta.splitFilename) document.getElementById('split-filename').value = meta.splitFilename;
             if (meta.mergeCompress) document.getElementById('merge-compress').value = meta.mergeCompress;
@@ -2004,6 +2143,31 @@
             if (meta.watermarkOutputFilename) {
                 document.getElementById('watermark-output-filename').value = meta.watermarkOutputFilename;
             }
+            // Global watermark panel (v3.0d)
+            if (meta.globalWatermarkEnabled !== undefined) {
+                document.getElementById('global-watermark-enabled').checked = meta.globalWatermarkEnabled;
+                state.globalWatermarkEnabled = meta.globalWatermarkEnabled;
+                if (meta.globalWatermarkEnabled) {
+                    document.getElementById('global-watermark-panel').classList.remove('hidden');
+                }
+            }
+            if (meta.globalWatermarkType !== undefined && meta.globalWatermarkType !== '') {
+                document.getElementById('global-watermark-type').value = meta.globalWatermarkType;
+                state.globalWatermarkType = meta.globalWatermarkType;
+                if (meta.globalWatermarkType === 'image:uploaded') {
+                    document.getElementById('global-watermark-upload-row').classList.remove('hidden');
+                    const cachedImg = await idbGet('watermarkImageData');
+                    if (cachedImg) {
+                        state.globalWatermarkImageName = cachedImg.name;
+                        document.getElementById('global-watermark-image-info').textContent = `📎 ${cachedImg.name} — 已從 IndexedDB 還原`;
+                    }
+                }
+            }
+            if (meta.globalWatermarkOpacity !== undefined) {
+                document.getElementById('global-watermark-opacity').value = meta.globalWatermarkOpacity;
+                state.globalWatermarkOpacity = meta.globalWatermarkOpacity;
+                document.getElementById('global-watermark-opacity-display').textContent = `${meta.globalWatermarkOpacity}%`;
+            }
             updateSearchButton();
             updateRedactionKeywordCount();
             updateWatermarkButton();
@@ -2026,7 +2190,7 @@
                 if (raw) meta = JSON.parse(raw);
             } catch {}
             if (meta) {
-                restoreFilenameInputs(meta);
+                await restoreFilenameInputs(meta);
                 restoreActiveTab(meta.activeMode);
             }
 
