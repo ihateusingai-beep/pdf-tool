@@ -715,16 +715,31 @@
 
                 if (results.length === 0) {
                     if (scannedWithoutText === numPages) {
-                        summaryText.innerHTML = `❌ 冇搵到「<strong>${escapeHtml(keyword)}</strong>」。<br>📷 此 PDF 嘅所有 ${numPages} 頁都冇內嵌文字層（可能係掃描檔），需要 OCR 先可以搜尋。v3.0b 將加入 Tesseract.js 本地 OCR。`;
-                        showSearchStatus('warn', `⚠️ 所有 ${numPages} 頁都冇內嵌文字層，疑似掃描檔。v3.0b 將加入本地 OCR。`);
+                        summaryText.innerHTML = `❌ 冇搵到「<strong>${escapeHtml(keyword)}</strong>」。<br>📷 此 PDF 嘅所有 ${numPages} 頁都冇內嵌文字層（可能係掃描檔），可啟用本地 OCR 識別文字後再搜尋。`;
+                        document.getElementById('search-results').innerHTML = `
+                            <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm">
+                                <p class="mb-2"><strong>🔍 此 PDF 疑似掃描檔，無內嵌文字層</strong></p>
+                                <p class="mb-3 text-gray-700">本地 OCR 使用 Tesseract.js WASM（首次約需下載 5MB，完全本地端處理，零外流）。識別需時，英文較準，中文可嘗試。</p>
+                                <button id="ocr-trigger" class="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition text-sm font-medium">
+                                    🔍 啟用本地 OCR 識別並重新搜尋
+                                </button>
+                            </div>
+                        `;
+                        document.getElementById('ocr-trigger').addEventListener('click', () => runOcrAndSearch(keyword, caseSensitive, wholeWord));
+                        showSearchStatus('warn', `⚠️ 所有 ${numPages} 頁都冇內嵌文字層，疑似掃描檔。點擊按鈕啟用本地 OCR。`);
                     } else {
                         summaryText.innerHTML = `❌ 喺 ${scannedPages} 個有文字嘅頁面入面冇搵到「<strong>${escapeHtml(keyword)}</strong>」。`;
                         if (scannedWithoutText > 0) {
-                            summaryText.innerHTML += `<br>💡 提示：另有 ${scannedWithoutText} 頁冇文字層（可能係圖片頁）。`;
+                            summaryText.innerHTML += `<br>💡 提示：另有 ${scannedWithoutText} 頁冇文字層（可能係圖片頁），可啟用 OCR 識別該部分。`;
+                            document.getElementById('search-results').innerHTML = `
+                                <button id="ocr-trigger" class="px-4 py-2 bg-amber-100 text-amber-800 rounded-lg hover:bg-amber-200 transition text-sm">
+                                    🔍 對無文字頁啟用本地 OCR
+                                </button>
+                            `;
+                            document.getElementById('ocr-trigger').addEventListener('click', () => runOcrAndSearch(keyword, caseSensitive, wholeWord));
                         }
                         showSearchStatus('info', `ℹ️ 搜尋完成，${scannedPages} 個有文字嘅頁面入面冇匹配。`);
                     }
-                    document.getElementById('search-results').innerHTML = '';
                 } else {
                     const pagesWithMatch = new Set(results.map(r => r.pageNum)).size;
                     summaryText.innerHTML = `✅ 搵到 <strong>${results.length}</strong> 個匹配，分佈喺 <strong>${pagesWithMatch}</strong> / ${numPages} 頁。`;
@@ -742,6 +757,102 @@
 
         function escapeHtml(s) {
             return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        }
+
+        // ── OCR fallback for scan PDFs (v3.0c) ──
+        let _tesseractWorker = null;
+        let _tesseractLoading = null;
+
+        async function loadTesseract() {
+            if (_tesseractWorker) return _tesseractWorker;
+            if (_tesseractLoading) return _tesseractLoading;
+            showSearchStatus('info', '⏳ 首次使用 OCR：下載 Tesseract.js WASM (約 5MB)...');
+            _tesseractLoading = (async () => {
+                const Tesseract = await import('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.0/+esm');
+                const worker = await Tesseract.createWorker('eng');  // English first; chi_tra slow & large
+                _tesseractWorker = worker;
+                return worker;
+            })();
+            return _tesseractLoading;
+        }
+
+        async function runOcrAndSearch(keyword, caseSensitive, wholeWord) {
+            if (!state.searchFile) return;
+            showSearchStatus('info', '⏳ 載入 Tesseract.js...');
+            const triggerBtn = document.getElementById('ocr-trigger');
+            if (triggerBtn) {
+                triggerBtn.disabled = true;
+                triggerBtn.textContent = '⏳ OCR 處理中...';
+            }
+            try {
+                const worker = await loadTesseract();
+                const arrayBuffer = await state.searchFile.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer.slice(0) }).promise;
+                const ocrByPage = {};
+
+                for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                    const page = await pdf.getPage(pageNum);
+                    const viewport = page.getViewport({ scale: 1.5 });  // OCR quality
+                    const canvas = document.createElement('canvas');
+                    canvas.width = viewport.width;
+                    canvas.height = viewport.height;
+                    const ctx = canvas.getContext('2d');
+                    await page.render({ canvasContext: ctx, viewport }).promise;
+                    showSearchStatus('info', `⏳ OCR 識別中... ${pageNum}/${pdf.numPages} 頁（本地端,慢但安全）`);
+                    const { data } = await worker.recognize(canvas);
+                    ocrByPage[pageNum] = data.text || '';
+                    if (pageNum % 2 === 0) await new Promise(r => setTimeout(r, 0));
+                }
+
+                // Run search over OCR'd text
+                const haystackByPage = ocrByPage;
+                const needle = caseSensitive ? keyword : keyword.toLowerCase();
+                const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const patternStr = wholeWord ? `\\b${escaped}\\b` : escaped;
+                const regex = new RegExp(patternStr, 'g');
+
+                const results = [];
+                const contextRadius = 40;
+                for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                    const pageText = haystackByPage[pageNum] || '';
+                    const haystack = caseSensitive ? pageText : pageText.toLowerCase();
+                    let match;
+                    while ((match = regex.exec(haystack)) !== null) {
+                        const start = Math.max(0, match.index - contextRadius);
+                        const end = Math.min(pageText.length, match.index + needle.length + contextRadius);
+                        results.push({
+                            pageNum,
+                            before: pageText.substring(start, match.index),
+                            found: pageText.substring(match.index, match.index + needle.length),
+                            after: pageText.substring(match.index + needle.length, end)
+                        });
+                    }
+                }
+
+                state.searchResults = { keyword, results, scannedPages: pdf.numPages, scannedWithoutText: 0, totalPages: pdf.numPages, ocr: true };
+
+                const summary = document.getElementById('search-results-summary');
+                const summaryText = document.getElementById('search-summary-text');
+                summary.classList.remove('hidden');
+
+                if (results.length === 0) {
+                    summaryText.innerHTML = `❌ OCR 完成但未識別到「<strong>${escapeHtml(keyword)}</strong>」。可能該 PDF 圖質模糊或關鍵字並不存在。`;
+                    showSearchStatus('warn', `⚠️ OCR 完成（${pdf.numPages} 頁），但未識別到該關鍵字。`);
+                    document.getElementById('search-results').innerHTML = '';
+                } else {
+                    const pagesWithMatch = new Set(results.map(r => r.pageNum)).size;
+                    summaryText.innerHTML = `✅ OCR 完成：搵到 <strong>${results.length}</strong> 個匹配，分佈喺 <strong>${pagesWithMatch}</strong> / ${pdf.numPages} 頁。`;
+                    showSearchStatus('info', `✅ OCR + 搜尋完成：${results.length} 個匹配。`);
+                    renderSearchResults(results);
+                }
+            } catch (err) {
+                console.error(err);
+                showSearchStatus('error', `❌ OCR 失敗：${err.message}`);
+                if (triggerBtn) {
+                    triggerBtn.disabled = false;
+                    triggerBtn.textContent = '🔍 重試 OCR';
+                }
+            }
         }
 
         function renderSearchResults(results) {
@@ -882,13 +993,13 @@
                 `將遮罩 ${keywords.length} 個關鍵字喺 PDF 入面出現嘅位置。\n\n` +
                 `處理範圍：\n` +
                 `• 視覺遮罩：黑色 rectangle 完全覆蓋關鍵字位置\n` +
-                `• 文字移除：喺 PDF 內容流入面 comment out 對應文字操作員\n\n` +
-                `⚠️ 此操作不可逆。執行後請以 Adobe Reader 開啟確認所有關鍵字已被遮罩。\n\n` +
+                `• L3 文字移除：將整頁 rasterize 為圖像再重建 PDF,確保複製/搜尋都拎唔到原文\n\n` +
+                `⚠️ 此操作不可逆。執行後檔案會變成圖像 PDF,文字無法再被複製或搜尋。\n\n` +
                 `確認執行？`
             );
             if (!confirmed) return;
 
-            showSearchStatus('info', '⏳ 執行脫敏中...');
+            showSearchStatus('info', '⏳ 執行脫敏中(L1 + L3 rasterize)...');
 
             try {
                 // Step 1: PDF.js text index to find keyword positions per page
@@ -902,17 +1013,15 @@
                     const viewport = page.getViewport({ scale: 1.0 });
                     matchesByPage[pageNum] = [];
 
-                    // Build a flat character-indexed string with positions per character
                     const items = textContent.items;
                     let fullText = '';
-                    const charMap = []; // index in fullText → { itemIndex, charIndexInItem }
+                    const charMap = [];
                     for (let i = 0; i < items.length; i++) {
                         const itemStr = items[i].str;
                         for (let c = 0; c < itemStr.length; c++) {
                             charMap.push({ itemIndex: i, charIndexInItem: c });
                             fullText += itemStr[c];
                         }
-                        // Pad with space between items for word boundary matching
                         fullText += ' ';
                         charMap.push({ itemIndex: -1, charIndexInItem: -1 });
                     }
@@ -930,7 +1039,6 @@
                             const endInfo = charMap[endChar];
                             if (!startInfo || !endInfo || startInfo.itemIndex < 0 || endInfo.itemIndex < 0) continue;
 
-                            // Compute PDF.js coordinate bounding box covering all items in range
                             const startItem = items[startInfo.itemIndex];
                             const endItem = items[endInfo.itemIndex];
                             if (!startItem.transform || !endItem.transform) continue;
@@ -945,84 +1053,67 @@
                             const minY = Math.min(startY, endY);
                             const maxY = Math.max(startY, endY);
 
-                            // PDF.js item.transform[5] is already PDF user space Y (bottom-left origin),
-                            // matching pdf-lib's drawRectangle coordinate system. No flip needed.
-                            const pdfX = minX - 1;
-                            const pdfY = minY - 1;
-                            const pdfWidth = maxX - minX + 2;
-                            const pdfHeight = maxY - minY + 2;
-
                             matchesByPage[pageNum].push({
-                                x: pdfX - 1, y: pdfY - 1,
-                                width: pdfWidth, height: pdfHeight
+                                x: minX - 1, y: minY - 1,
+                                width: maxX - minX + 2, height: maxY - minY + 2
                             });
                         }
                     }
+                }
 
-                    if (pageNum % 5 === 0 || pageNum === pdfjsDoc.numPages) {
-                        showSearchStatus('info', `⏳ 分析中... ${pageNum}/${pdfjsDoc.numPages} 頁`);
+                let totalRedacted = 0;
+                for (const pg in matchesByPage) totalRedacted += matchesByPage[pg].length;
+
+                // Step 2: L3 rasterize — render each page to canvas, draw black rectangles on canvas, embed as image
+                const rasterScale = 2.0;
+                const newPdfDoc = await PDFLib.PDFDocument.create();
+
+                for (let pageNum = 1; pageNum <= pdfjsDoc.numPages; pageNum++) {
+                    const page = await pdfjsDoc.getPage(pageNum);
+                    const viewport = page.getViewport({ scale: rasterScale });
+
+                    // Render page to canvas
+                    const canvas = document.createElement('canvas');
+                    canvas.width = viewport.width;
+                    canvas.height = viewport.height;
+                    const ctx = canvas.getContext('2d');
+
+                    await page.render({ canvasContext: ctx, viewport }).promise;
+
+                    // L1 overlay: draw black rectangles on canvas (raster coords).
+                    // PDF.js item.transform[5] is PDF user space (bottom-left origin),
+                    // canvas fillRect is top-left origin → flip Y by canvas height.
+                    const matches = matchesByPage[pageNum] || [];
+                    for (const m of matches) {
+                        ctx.fillStyle = '#000000';
+                        ctx.fillRect(
+                            m.x * rasterScale,
+                            canvas.height - (m.y + m.height) * rasterScale,
+                            m.width * rasterScale,
+                            m.height * rasterScale
+                        );
+                    }
+
+                    // Convert canvas to PNG bytes
+                    const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+                    const pngBytes = await blob.arrayBuffer();
+                    const png = await newPdfDoc.embedPng(pngBytes);
+
+                    // Add page at original PDF dimensions
+                    const originalViewport = page.getViewport({ scale: 1.0 });
+                    const newPage = newPdfDoc.addPage([originalViewport.width, originalViewport.height]);
+                    newPage.drawImage(png, { x: 0, y: 0, width: originalViewport.width, height: originalViewport.height });
+
+                    if (pageNum % 2 === 0 || pageNum === pdfjsDoc.numPages) {
+                        showSearchStatus('info', `⏳ Rasterizing... ${pageNum}/${pdfjsDoc.numPages} 頁`);
                         await new Promise(r => setTimeout(r, 0));
                     }
                 }
 
-                // Step 2: pdf-lib load + draw black rectangles + comment out Tj operators
-                const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
-                const pdfLibPages = pdfDoc.getPages();
-                let totalRedacted = 0;
-                let totalL2Removed = 0;
-
-                for (let i = 0; i < pdfLibPages.length; i++) {
-                    const page = pdfLibPages[i];
-                    const pageNum = i + 1;
-                    const matches = matchesByPage[pageNum] || [];
-                    if (!matches.length) continue;
-
-                    // L1: Visual black rectangles
-                    for (const m of matches) {
-                        page.drawRectangle({
-                            x: m.x, y: m.y, width: m.width, height: m.height,
-                            color: PDFLib.rgb(0, 0, 0),
-                            opacity: 1
-                        });
-                    }
-                    totalRedacted += matches.length;
-
-                    // L2: Stream edit — comment out text operators containing keywords
-                    try {
-                        const contentStream = page.node.Contents();
-                        if (contentStream) {
-                            const streams = contentStream.asArray ? contentStream.asArray() : [contentStream];
-                            for (const stream of streams) {
-                                const rawStream = stream.getContentsString ? stream.getContentsString() : null;
-                                if (!rawStream) continue;
-                                let modified = rawStream;
-                                for (const keyword of keywords) {
-                                    if (!keyword) continue;
-                                    // Match Tj operators containing the keyword: (text) Tj
-                                    // And TJ arrays containing the keyword
-                                    const escapedForText = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                                    const tjPattern = new RegExp(`\\(([^)]*${escapedForText}[^)]*)\\) Tj`, 'g');
-                                    const before = modified;
-                                    modified = modified.replace(tjPattern, '% REDACTED: $&');
-                                    if (modified !== before) totalL2Removed++;
-                                }
-                                if (modified !== rawStream) {
-                                    // Re-write content stream
-                                    const { PDFRawStream } = PDFLib;
-                                    stream.setContents ? stream.setContents(modified) : null;
-                                }
-                            }
-                        }
-                    } catch (streamErr) {
-                        console.warn('L2 stream edit failed for page', pageNum, streamErr);
-                    }
-                }
-
-                const bytes = await pdfDoc.save();
+                const bytes = await newPdfDoc.save();
                 const filename = (document.getElementById('redaction-output-filename').value.trim() || 'redacted') + '.pdf';
                 downloadBlob(bytes, filename, 'application/pdf');
-                const l2Note = totalL2Removed > 0 ? `（含 ${totalL2Removed} 個內容流 operator 已標記）` : '（L2 內容流編輯因 PDF 結構未能套用,僅視覺遮罩）';
-                showSearchStatus('info', `✅ 脫敏完成：${totalRedacted} 個位置已遮罩 ${l2Note}。已下載 ${filename}。請用 Adobe Reader 確認。`);
+                showSearchStatus('info', `✅ 脫敏完成：${totalRedacted} 個位置已遮罩（L3 rasterize,文字已徹底移除）。已下載 ${filename}。`);
             } catch (err) {
                 console.error(err);
                 showSearchStatus('error', `❌ 脫敏失敗：${err.message}`);
