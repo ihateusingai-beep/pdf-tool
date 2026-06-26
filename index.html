@@ -1557,32 +1557,56 @@
                     document.getElementById('loading-text').textContent = `正在轉換檔案...\n已處理 ${i + 1}/${total} 個`;
                     const filename = file.name.replace(/\.(docx?|txt|rtf)$/i, '');
 
-                    const container = document.createElement('div');
-                    container.style.cssText = 'position:absolute;left:-9999px;top:0;width:794px;background:white;font-family:system-ui,Arial,sans-serif;padding:20px;font-size:14px;line-height:1.8';
-                    document.body.appendChild(container);
+                    // S6: html2canvas(v0.4.x, embedded in html2pdf.js v0.10.1) 唔可以 capture
+                    // 任何 off-screen element(position:fixed/absolute + 負 coords / transform
+                    // / opacity:0 全部 silently skip,result PDF 完全空白)。
+// 唯一可靠嘅 path:用 <iframe srcdoc> 做 sandbox — iframe 係獨立 document,
+// 即使 parent 將 iframe 推去 -99999px,iframe 入面 body element 對 h2c 嚟講
+// 仍然係 visible in-document,所以 capture 正常。
+const iframe = document.createElement('iframe');
+iframe.setAttribute('aria-hidden', 'true');
+iframe.style.cssText = 'position:fixed;left:-99999px;top:0;width:794px;height:1200px;border:0;background:white;visibility:hidden';
+document.body.appendChild(iframe);
 
-                    if (file.name.endsWith('.txt') || file.name.endsWith('.rtf')) {
-                        const text = await file.text();
-                        container.innerHTML = `<pre style="white-space:pre-wrap;word-wrap:break-word">${text.replace(/</g, '&lt;')}</pre>`;
-                    } else {
-                        try {
-                            const arrayBuffer = await file.arrayBuffer();
-                            const result = await mammoth.convertToHtml({ arrayBuffer });
-                            container.innerHTML = result.value;
-                        } catch (e) {
-                            container.innerHTML = `<p style="color:red">轉換失敗：${file.name} 格式不支援，請另存為 .docx</p>`;
-                        }
-                    }
+const idoc = iframe.contentDocument || iframe.contentWindow.document;
+const innerContent = await (async () => {
+    if (file.name.endsWith('.txt') || file.name.endsWith('.rtf')) {
+        const text = await file.text();
+        return `<pre style="white-space:pre-wrap;word-wrap:break-word;margin:0;font-family:system-ui,Arial,'Noto Sans TC',sans-serif">${text.replace(/</g, '&lt;')}</pre>`;
+    } else {
+        try {
+            const arrayBuffer = await file.arrayBuffer();
+            const result = await mammoth.convertToHtml({ arrayBuffer });
+            return result.value;
+        } catch (e) {
+            return `<p style="color:red">轉換失敗:${file.name} 格式不支援,請另存為 .docx</p>`;
+        }
+    }
+})();
 
-                    const pdfBlob = await html2pdf().set({
-                        margin: 15,
-                        image: { type: 'jpeg', quality: 0.95 },
-                        html2canvas: { scale: 3, useCORS: true, logging: false },
-                        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-                    }).from(container).outputPdf('blob');
+idoc.open();
+idoc.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+body{margin:0;padding:20px;background:white;font-family:system-ui,Arial,'Noto Sans TC','Microsoft JhengHei',sans-serif;font-size:14px;line-height:1.8;color:#000}
+h1,h2,h3,h4{font-family:inherit;margin:0.5em 0}
+p{margin:0.5em 0}
+table{border-collapse:collapse;margin:0.5em 0}
+td,th{border:1px solid #ccc;padding:4px 8px}
+img{max-width:100%;height:auto}
+</style></head><body>${innerContent}</body></html>`);
+idoc.close();
 
-                    document.body.removeChild(container);
-                    zip.file(filename + '.pdf', pdfBlob);
+// S6: 等 iframe 內 document 嘅 layout + fonts settle 完。
+await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+const pdfBlob = await html2pdf().set({
+    margin: 15,
+    image: { type: 'jpeg', quality: 0.95 },
+    html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+}).from(idoc.body).outputPdf('blob');
+
+document.body.removeChild(iframe);
+zip.file(filename + '.pdf', pdfBlob);
                 }
 
                 const content = await zip.generateAsync({ type: 'blob' });
