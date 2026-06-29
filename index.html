@@ -85,6 +85,71 @@
         body.dark #global-watermark-panel { background-color: #2e1065; border-color: #6d28d9; color: #ede9fe; }
         body.dark #global-watermark-panel select { background-color: var(--accent-bg); color: var(--text-primary); }
         body.dark #global-watermark-panel select option { background-color: var(--bg-white); }
+
+        /* ── UI1: Active tab visual reinforcement ── */
+        .tab-btn { position: relative; transition: background-color 0.15s, color 0.15s; min-height: 48px; }
+        .tab-active { background-color: rgba(255, 255, 255, 0.5); border-bottom-width: 4px !important; font-weight: 700; }
+        body.dark .tab-active { background-color: rgba(255, 255, 255, 0.05); }
+        @media (max-width: 640px) {
+            .tab-btn { font-size: 0.8rem; padding: 0.5rem 0.25rem; min-height: 52px; }
+        }
+
+        /* ── UI2: Toast (Sonner-style) ── */
+        #toast-container { position: fixed; bottom: 1.25rem; right: 1.25rem; z-index: 100; display: flex; flex-direction: column; gap: 0.5rem; pointer-events: none; max-width: 380px; }
+        .toast {
+            background-color: #ffffff; color: #1f2937;
+            padding: 0.75rem 1rem; border-radius: 0.5rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            border-left: 4px solid #6366f1;
+            font-size: 0.875rem;
+            opacity: 0; transform: translateX(1.25rem);
+            transition: opacity 0.2s, transform 0.2s;
+            pointer-events: auto;
+        }
+        .toast.show { opacity: 1; transform: translateX(0); }
+        .toast.success { border-left-color: #10b981; }
+        .toast.error   { border-left-color: #ef4444; }
+        .toast.warn    { border-left-color: #f59e0b; }
+        body.dark .toast { background-color: #1f2937; color: #f9fafb; }
+
+        /* ── UX1: First-time tooltip ── */
+        .first-time-tooltip {
+            position: relative;
+            background-color: #fef3c7; color: #78350f;
+            padding: 0.75rem 2.5rem 0.75rem 1rem; border-radius: 0.5rem;
+            border: 1px solid #fbbf24;
+            font-size: 0.85rem;
+            margin: 0.5rem 0 1rem 0;
+        }
+        body.dark .first-time-tooltip { background-color: #422006; color: #fbbf24; border-color: #f59e0b; }
+        .first-time-tooltip button {
+            position: absolute; top: 0.4rem; right: 0.4rem;
+            background: transparent; border: 0; cursor: pointer; font-size: 1rem; color: inherit;
+        }
+
+        /* ── F1: Redaction diff preview ── */
+        #redaction-diff-preview {
+            max-height: 320px; overflow-y: auto;
+            background-color: #f9fafb; padding: 0.75rem; border-radius: 0.5rem;
+            border: 1px solid #e5e7eb; margin: 0.5rem 0;
+            font-family: ui-monospace, SFMono-Regular, monospace; font-size: 0.85rem; line-height: 1.5;
+            white-space: pre-wrap; word-wrap: break-word;
+        }
+        body.dark #redaction-diff-preview { background-color: #374151; border-color: #4b5563; }
+        #redaction-diff-preview mark { background-color: #fca5a5; color: #7f1d1d; padding: 0 2px; border-radius: 2px; }
+        body.dark #redaction-diff-preview mark { background-color: #b91c1c; color: #fee2e2; }
+        #redaction-diff-preview .preview-page-label {
+            display: block; margin-top: 0.5rem; color: #6b7280; font-size: 0.75rem;
+        }
+        body.dark #redaction-diff-preview .preview-page-label { color: #9ca3af; }
+
+        /* ── UI3: Empty state hint ── */
+        .dropzone-hint { font-size: 0.75rem; color: #6b7280; margin-top: 0.5rem; }
+        body.dark .dropzone-hint { color: #9ca3af; }
+
+        /* ── A5: Metadata strip indicator ── */
+        .meta-strip-note { font-size: 0.7rem; color: #059669; }
+        body.dark .meta-strip-note { color: #34d399; }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
@@ -140,6 +205,14 @@
                     <p id="global-watermark-image-info" class="text-xs text-gray-500 mt-1"></p>
                 </div>
                 <p class="text-xs text-gray-500">啟用後,任何 mode 嘅輸出（合併/分割/批次/Word/圖片）都會自動加浮水印。執行時右上角會顯示「正在套用浮水印...」。</p>
+
+                <!-- A5: PDF metadata auto-strip (default-on for privacy) -->
+                <div class="border-t border-violet-200 pt-2 mt-2">
+                    <label class="flex items-center gap-2 text-xs">
+                        <input type="checkbox" id="meta-strip-enabled" class="w-4 h-4 rounded" checked>
+                        <span class="text-gray-700">🛡️ 自動清除 PDF metadata（作者/軟件/建立日期）— 預設開啟,對齊「零外流」立場</span>
+                    </label>
+                </div>
             </div>
         </header>
 
@@ -172,6 +245,7 @@
                 <div id="merge-dropzone" class="dropzone rounded-xl p-8 text-center cursor-pointer mb-4">
                     <div class="text-4xl mb-2">📁</div>
                     <p class="text-gray-600">拖曳 PDF 檔案到此處，或點擊上傳</p>
+                    <p class="dropzone-hint">支援多個 PDF 一次合併,完成後可加浮水印 / 密碼保護</p>
                     <input type="file" id="merge-input" multiple accept=".pdf" class="hidden">
                 </div>
 
@@ -214,6 +288,7 @@
                 <div id="split-dropzone" class="dropzone rounded-xl p-8 text-center cursor-pointer mb-4">
                     <div class="text-4xl mb-2">📄</div>
                     <p class="text-gray-600">拖曳 PDF 檔案到此處，或點擊上傳</p>
+                    <p class="dropzone-hint">單檔上傳,點擊縮圖選取要擷取嘅頁 → ZIP 或合併輸出</p>
                     <input type="file" id="split-input" accept=".pdf" class="hidden">
                 </div>
 
@@ -253,6 +328,7 @@
                 <div id="convert-dropzone" class="dropzone rounded-xl p-8 text-center cursor-pointer mb-4">
                     <div class="text-4xl mb-2">📝</div>
                     <p class="text-gray-600">拖曳 Word/文字檔案到此處，或點擊上傳</p>
+                    <p class="dropzone-hint">Word (.docx) / .txt / .rtf,完成後打包成 ZIP 即下載</p>
                     <input type="file" id="convert-input" multiple accept=".docx,.txt,.rtf" class="hidden">
                 </div>
 
@@ -289,6 +365,7 @@
                 <div id="batch-dropzone" class="dropzone rounded-xl p-8 text-center cursor-pointer mb-4">
                     <div class="text-4xl mb-2">📂</div>
                     <p class="text-gray-600">拖曳 PDF 檔案到此處，或點擊上傳</p>
+                    <p class="dropzone-hint">多檔加工（加頁碼 / 插空白頁）後打包 ZIP</p>
                     <input type="file" id="batch-input" multiple accept=".pdf" class="hidden">
                 </div>
 
@@ -306,6 +383,7 @@
                 <div id="image-dropzone" class="dropzone rounded-xl p-8 text-center cursor-pointer mb-4">
                     <div class="text-4xl mb-2">🖼️</div>
                     <p class="text-gray-600">拖曳圖片到此處，或點擊上傳（可多選）</p>
+                    <p class="dropzone-hint">JPG / PNG / WebP / GIF,可合併或獨立 PDF</p>
                     <input type="file" id="image-input" multiple accept="image/jpeg,image/png,image/webp,image/gif" class="hidden">
                 </div>
 
@@ -373,6 +451,7 @@
                         <div id="search-dropzone" class="dropzone rounded-xl p-6 text-center cursor-pointer">
                             <div class="text-3xl mb-2">📄</div>
                             <p class="text-gray-600 text-sm">拖曳 PDF 到此處，或點擊上傳（單檔）</p>
+                            <p class="dropzone-hint">單檔搜尋,並準備脫敏關鍵字清單 / 套浮水印</p>
                             <input type="file" id="search-input" accept=".pdf" class="hidden">
                         </div>
                         <p id="search-filename-display" class="text-xs text-gray-500 mt-2 truncate"></p>
@@ -403,13 +482,29 @@
                     </button>
                 </div>
 
-                <div id="search-status" class="hidden mb-4 p-3 rounded-lg text-sm"></div>
+                <div class="flex items-stretch gap-2 mb-4">
+                    <div id="search-status" class="hidden flex-1 p-3 rounded-lg text-sm"></div>
+                    <!-- F2: cancel button surfaced while OCR is running -->
+                    <button id="ocr-cancel" class="hidden px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition text-sm font-medium self-start" type="button">
+                        ⛔ 取消 OCR
+                    </button>
+                </div>
 
                 <div id="search-results-summary" class="hidden mb-4 p-3 bg-violet-50 border border-violet-200 rounded-lg text-sm">
                     <strong>📊 結果：</strong><span id="search-summary-text"></span>
                 </div>
 
-                <div id="search-results" class="space-y-2 mb-6"></div>
+                <div id="search-results" class="space-y-2 mb-3"></div>
+
+                <!-- F3: Export search results as CSV -->
+                <button id="search-export-csv" class="hidden w-full mb-3 py-2 bg-violet-100 text-violet-800 rounded-lg hover:bg-violet-200 transition text-sm font-medium">
+                    📥 匯出搜尋結果為 CSV
+                </button>
+
+                <!-- A2: Send search keywords → redaction keyword list -->
+                <button id="search-to-redaction" class="hidden w-full mb-6 py-2 bg-amber-100 text-amber-800 rounded-lg hover:bg-amber-200 transition text-sm font-medium">
+                    🛡️ 將呢個搜尋關鍵字加落脫敏清單
+                </button>
 
                 <div class="border-t border-gray-200 pt-6 mt-6">
                     <h3 class="text-lg font-bold text-gray-800 mb-2">🔒 脫敏關鍵字清單</h3>
@@ -420,8 +515,18 @@
                             <input type="file" id="redaction-keywords-file" accept=".txt,.csv" class="text-sm">
                             <span class="text-gray-500">或上傳 .txt / .csv 關鍵字清單</span>
                         </label>
+                        <!-- F4: Download template -->
+                        <button id="redaction-download-template" class="text-sm text-violet-600 hover:text-violet-800 underline" type="button">
+                            📥 下載範本
+                        </button>
                     </div>
                     <p class="text-xs text-gray-500 mb-3" id="redaction-keyword-count">0 個關鍵字</p>
+
+                    <!-- F1: Redaction diff preview (live keyword match preview) -->
+                    <details class="mb-3">
+                        <summary class="text-xs text-gray-600 cursor-pointer hover:text-gray-800">🔍 預覽將會被遮罩嘅位置（執行前確認）</summary>
+                        <div id="redaction-diff-preview" class="mt-2"></div>
+                    </details>
                     <div class="flex flex-wrap items-center gap-3 mb-2">
                         <label class="flex items-center gap-2 text-sm text-gray-700">
                             <input type="text" id="redaction-output-filename" placeholder="輸出檔名（預設：redacted）" value="redacted" class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm w-48">
@@ -489,7 +594,51 @@
         </div>
     </div>
 
+    <!-- UI2: Toast container -->
+    <div id="toast-container" aria-live="polite" aria-atomic="true"></div>
+
     <script>
+        // ── UI2: Toast helper (replaces native alert() where appropriate) ──
+        function toast(message, type = 'info', durationMs = 3500) {
+            const container = document.getElementById('toast-container');
+            const el = document.createElement('div');
+            el.className = `toast ${type}`;
+            el.setAttribute('role', type === 'error' ? 'alert' : 'status');
+            el.textContent = message;
+            container.appendChild(el);
+            // Force reflow then add .show for transition
+            void el.offsetWidth;
+            el.classList.add('show');
+            setTimeout(() => {
+                el.classList.remove('show');
+                setTimeout(() => el.remove(), 220);
+            }, durationMs);
+        }
+
+        // ── UX2: Translate raw error → human-readable message ──
+        function friendlyError(err, fallback = '操作失敗') {
+            const msg = (err?.message || String(err || '')).toLowerCase();
+            if (msg.includes('password') || msg.includes('encrypt')) {
+                return '此 PDF 已被加密或無法加密。請先用 Adobe Reader 解密,或留空密碼欄位。';
+            }
+            if (msg.includes('invalid pdf') || msg.includes('parse')) {
+                return 'PDF 格式損壞或唔標準。請用 Adobe Reader 重新匯出。';
+            }
+            if (msg.includes('chinese font') || msg.includes('notosans') || msg.includes('fontkit')) {
+                return '中文浮水印字型未載入。請檢查網絡或改用英文浮水印。';
+            }
+            if (msg.includes('wsm') || msg.includes('failed to fetch') || msg.includes('networkerror')) {
+                return '瀏覽器阻擋了引擎下載。請檢查網絡或使用 Chrome。';
+            }
+            if (msg.includes('out of memory') || msg.includes('allocation')) {
+                return '檔案太大超出瀏覽器記憶體。請分批處理。';
+            }
+            if (msg.includes('quota') || msg.includes('exceeded')) {
+                return '本機儲存空間不足。請清除 IndexedDB cache 後重試。';
+            }
+            return `${fallback}: ${err?.message || err}`;
+        }
+
         const state = {
             mergeFiles: [],
             splitFile: null,
@@ -511,11 +660,43 @@
             globalWatermarkEnabled: false,
             globalWatermarkType: '',
             globalWatermarkOpacity: 15,
-            globalWatermarkImageName: ''
+            globalWatermarkImageName: '',
+            // A5: Metadata auto-strip (default-on for privacy stance)
+            metaStripEnabled: true,
+            // F2: OCR cancellation flag
+            ocrCancelled: false,
+            // A3: Watermark recall (session-only — IDB already covers cross-session)
+            watermarkImageRecalled: false
         };
 
         function naturalSort(files) {
             return files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+        }
+
+        // ── A5: PDF metadata auto-strip helper ──
+        // Strips potentially-leaking Author / Creator / Producer / dates from a PDF before download.
+        // Pure client-side mutation; preserves all page content.
+        async function stripPdfMetadata(pdfBytes) {
+            try {
+                const pdfDoc = await PDFLib.PDFDocument.load(pdfBytes);
+                pdfDoc.setTitle('');
+                pdfDoc.setAuthor('Anonymous');
+                pdfDoc.setSubject('');
+                pdfDoc.setKeywords([]);
+                pdfDoc.setCreator('');
+                pdfDoc.setProducer('');
+                pdfDoc.setCreationDate(new Date());
+                pdfDoc.setModificationDate(new Date());
+                return await pdfDoc.save();
+            } catch (e) {
+                console.warn('metadata strip failed (returning original bytes):', e);
+                return pdfBytes;
+            }
+        }
+
+        // ── UI2: Reusable encryption-not-supported notification ──
+        function notifyEncryptUnsupported() {
+            toast('⚠️ 此瀏覽器模式不支援 PDF 加密,將輸出未加密版本。請用 Adobe Acrobat 加密後分發。', 'warn', 5000);
         }
 
         function setupDropzone(dropzoneId, inputId, onFiles) {
@@ -661,7 +842,34 @@
             updateRedactionButton();
             clearSearchResults();
             document.getElementById('search-status').classList.add('hidden');
+            renderRedactionDiffPreview();  // F1: refresh preview when PDF changes
+            // A1: Auto-detect scan PDF — warn if search results likely empty
+            if (state.redactionKeywords.split('\n').filter(l => l.trim() && !l.startsWith('#')).length === 0) {
+                detectScanPdf(pdf);  // A1: only when no keywords yet (so it doesn't conflict with F1 preview use)
+            }
         });
+
+        // A1: Auto-detect scan PDF — when text layer is empty on every page, suggest OCR
+        async function detectScanPdf(file) {
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer.slice(0) }).promise;
+                const samplePages = Math.min(pdf.numPages, 3);
+                let pagesWithText = 0;
+                for (let i = 1; i <= samplePages; i++) {
+                    const page = await pdf.getPage(i);
+                    const tc = await page.getTextContent();
+                    const text = tc.items.map(it => it.str).join(' ').trim();
+                    if (text.length > 5) pagesWithText++;
+                }
+                if (pagesWithText === 0) {
+                    showSearchStatus('warn', '🔍 偵測到掃描檔:此 PDF 所有頁面都冇內嵌文字層,搜尋將會空手。建議啟用本地 OCR。');
+                    toast('📷 偵測到掃描檔 PDF,可用 OCR 識別', 'warn', 5000);
+                }
+            } catch (e) {
+                // Silent — detection is best-effort
+            }
+        }
 
         document.getElementById('search-keyword').addEventListener('input', (e) => {
             state.searchKeyword = e.target.value;
@@ -682,6 +890,7 @@
             state.searchResults = null;
             document.getElementById('search-keyword').value = '';
             document.getElementById('search-filename-display').textContent = '';
+            document.getElementById('search-export-csv').classList.add('hidden');
             updateSearchButton();
             updateWatermarkButton();
             updateRedactionButton();
@@ -689,9 +898,58 @@
             document.getElementById('search-status').classList.add('hidden');
         });
 
+        // F3: Export search results as CSV
+        document.getElementById('search-export-csv').addEventListener('click', () => {
+            if (!state.searchResults || !state.searchResults.results?.length) {
+                toast('冇結果可以匯出', 'warn');
+                return;
+            }
+            const { keyword, results } = state.searchResults;
+            const rows = [['頁碼', '匹配編號', '上下文']];
+            results.forEach((r, i) => {
+                const context = (r.before + r.found + r.after).replace(/\s+/g, ' ').trim();
+                rows.push([r.pageNum, i + 1, context]);
+            });
+            const csv = rows.map(row => row.map(cell => {
+                const s = String(cell);
+                return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+            }).join(',')).join('\n');
+            const bom = '\uFEFF';  // UTF-8 BOM for Excel compatibility
+            const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8' });
+            const stamp = new Date().toISOString().slice(0, 10);
+            downloadBlob(blob, `search_${keyword.replace(/[^\w\u4e00-\u9fff]/g, '_')}_${stamp}.csv`);
+            toast(`✅ 已匯出 ${results.length} 個匹配`, 'success');
+        });
+
+        // F2: OCR cancel button handler
+        document.getElementById('ocr-cancel').addEventListener('click', () => {
+            state.ocrCancelled = true;
+            toast('⏳ 正在取消 OCR...', 'warn', 1500);
+        });
+
+        // A2: Transfer search keyword to redaction list
+        document.getElementById('search-to-redaction').addEventListener('click', () => {
+            if (!state.searchResults?.keyword) return;
+            const keyword = state.searchResults.keyword.trim();
+            if (!keyword) return;
+            const ta = document.getElementById('redaction-keywords');
+            const lines = ta.value.split('\n').map(l => l.trim()).filter(Boolean);
+            if (lines.includes(keyword)) {
+                toast(`「${keyword}」已經喺脫敏清單入面`, 'warn', 2500);
+                return;
+            }
+            lines.push(keyword);
+            ta.value = lines.join('\n');
+            updateRedactionKeywordCount();
+            updateRedactionButton();
+            renderRedactionDiffPreview();  // F1: refresh preview
+            toast(`✅ 已將「${keyword}」加落脫敏清單（共 ${lines.length} 個）`, 'success');
+        });
+
         document.getElementById('redaction-keywords').addEventListener('input', () => {
             updateRedactionKeywordCount();
             updateRedactionButton();
+            renderRedactionDiffPreview();  // F1: refresh preview on edit
         });
 
         document.getElementById('redaction-keywords-file').addEventListener('change', async (e) => {
@@ -702,11 +960,73 @@
                 const ta = document.getElementById('redaction-keywords');
                 ta.value = text;
                 updateRedactionKeywordCount();
+                renderRedactionDiffPreview();  // F1: refresh preview after upload
             } catch (err) {
-                showSearchStatus('error', `⚠️ 讀取關鍵字檔失敗：${err.message}`);
+                showSearchStatus('error', `⚠️ 讀取關鍵字檔失敗:${err.message}`);
             }
             e.target.value = '';
         });
+
+        // F4: Download keyword list template
+        document.getElementById('redaction-download-template').addEventListener('click', () => {
+            const template = `# 脫敏關鍵字範本
+# 一行一個關鍵字,以 # 起頭嘅係註解
+# 支援中英文 / 數字 / 符號
+# 範例:
+陳小明
+李大文
+A123456(7)
+9123-4567
+家長：陳先生
+2024-IEP
+過敏：花生
+`;
+            const blob = new Blob([template], { type: 'text/plain;charset=utf-8' });
+            downloadBlob(blob, 'redaction_template.txt');
+            toast('✅ 範本已下載', 'success', 2000);
+        });
+
+        // F1: Render side-by-side preview of keyword matches across PDF pages
+        async function renderRedactionDiffPreview() {
+            const previewEl = document.getElementById('redaction-diff-preview');
+            const keywords = state.redactionKeywords.split('\n').map(l => l.trim()).filter(l => l.length > 0 && !l.startsWith('#'));
+            if (!state.searchFile || keywords.length === 0) {
+                if (previewEl) previewEl.innerHTML = '';
+                return;
+            }
+            if (!previewEl) return;
+            previewEl.innerHTML = '<p class="text-xs text-gray-500">⏳ 解析 PDF 文字層...</p>';
+            try {
+                const arrayBuffer = await state.searchFile.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer.slice(0) }).promise;
+                const escapedKeywords = keywords.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+                const regex = new RegExp(`(${escapedKeywords.join('|')})`, 'g');
+                const html = [];
+                let totalMatches = 0;
+                for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                    const page = await pdf.getPage(pageNum);
+                    const textContent = await page.getTextContent();
+                    const pageText = textContent.items.map(it => it.str).join(' ');
+                    if (!pageText.trim()) continue;
+                    let pageMatches = 0;
+                    const highlighted = escapeHtml(pageText).replace(regex, (m) => {
+                        pageMatches++;
+                        totalMatches++;
+                        return `<mark>${m}</mark>`;
+                    });
+                    if (pageMatches > 0) {
+                        html.push(`<span class="preview-page-label">第 ${pageNum} 頁（${pageMatches} 個匹配）</span>${highlighted}`);
+                    }
+                }
+                if (totalMatches === 0) {
+                    previewEl.innerHTML = '<p class="text-xs text-gray-500">ℹ️ 喺呢個 PDF 入面搵唔到任何關鍵字。檢查拼字 / 大小寫 / 上載咗文字層嘅 PDF。</p>';
+                } else {
+                    previewEl.innerHTML = `<p class="text-xs font-medium mb-2" style="color:#059669">✅ 預覽：共 ${totalMatches} 個匹配會被遮罩</p>` + html.join('');
+                }
+            } catch (err) {
+                previewEl.innerHTML = `<p class="text-xs text-red-500">⚠️ 預覽失敗:${escapeHtml(err.message)}</p>`;
+            }
+        }
 
         document.getElementById('search-execute').addEventListener('click', runSearch);
 
@@ -811,9 +1131,20 @@
                     showSearchStatus('info', `✅ 完成：${results.length} 個匹配，${pagesWithMatch} 頁。`);
                     renderSearchResults(results);
                 }
+
+                // F3 + A2: Toggle CSV export + keyword transfer buttons
+                const exportBtn = document.getElementById('search-export-csv');
+                const xferBtn = document.getElementById('search-to-redaction');
+                if (results.length > 0) {
+                    exportBtn.classList.remove('hidden');
+                    xferBtn.classList.remove('hidden');
+                } else {
+                    exportBtn.classList.add('hidden');
+                    xferBtn.classList.add('hidden');
+                }
             } catch (err) {
                 console.error(err);
-                showSearchStatus('error', `❌ 搜尋失敗：${err.message}`);
+                showSearchStatus('error', `❌ ${friendlyError(err, '搜尋失敗')}`);
             } finally {
                 document.getElementById('search-execute').disabled = false;
                 updateSearchButton();
@@ -843,12 +1174,16 @@
 
         async function runOcrAndSearch(keyword, caseSensitive, wholeWord) {
             if (!state.searchFile) return;
+            state.ocrCancelled = false;
             showSearchStatus('info', '⏳ 載入 Tesseract.js...');
             const triggerBtn = document.getElementById('ocr-trigger');
             if (triggerBtn) {
                 triggerBtn.disabled = true;
                 triggerBtn.textContent = '⏳ OCR 處理中...';
             }
+            // F2: Surface cancel button while OCR is running
+            const ocrCancelBtn = document.getElementById('ocr-cancel');
+            if (ocrCancelBtn) ocrCancelBtn.classList.remove('hidden');
             try {
                 const worker = await loadTesseract();
                 const arrayBuffer = await state.searchFile.arrayBuffer();
@@ -856,6 +1191,12 @@
                 const ocrByPage = {};
 
                 for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                    if (state.ocrCancelled) {
+                        showSearchStatus('warn', `⚠️ OCR 已取消（已完成 ${pageNum - 1}/${pdf.numPages} 頁）`);
+                        if (triggerBtn) { triggerBtn.disabled = false; triggerBtn.textContent = '🔍 重新 OCR'; }
+                        if (ocrCancelBtn) ocrCancelBtn.classList.add('hidden');
+                        return;
+                    }
                     const page = await pdf.getPage(pageNum);
                     const viewport = page.getViewport({ scale: 1.5 });  // OCR quality
                     const canvas = document.createElement('canvas');
@@ -863,7 +1204,7 @@
                     canvas.height = viewport.height;
                     const ctx = canvas.getContext('2d');
                     await page.render({ canvasContext: ctx, viewport }).promise;
-                    showSearchStatus('info', `⏳ OCR 識別中... ${pageNum}/${pdf.numPages} 頁（本地端,慢但安全）`);
+                    showSearchStatus('info', `⏳ OCR 識別中... ${pageNum}/${pdf.numPages} 頁（本地端,可隨時取消）`);
                     const { data } = await worker.recognize(canvas);
                     ocrByPage[pageNum] = data.text || '';
                     if (pageNum % 2 === 0) await new Promise(r => setTimeout(r, 0));
@@ -910,14 +1251,17 @@
                     showSearchStatus('info', `✅ OCR + 搜尋完成：${results.length} 個匹配。`);
                     renderSearchResults(results);
                 }
-            } catch (err) {
+                } catch (err) {
                 console.error(err);
-                showSearchStatus('error', `❌ OCR 失敗：${err.message}`);
+                showSearchStatus('error', `❌ ${friendlyError(err, 'OCR 失敗')}`);
                 if (triggerBtn) {
                     triggerBtn.disabled = false;
                     triggerBtn.textContent = '🔍 重試 OCR';
                 }
             }
+            // F2: Hide OCR cancel button when OCR completes (success or error)
+            const ocrCancelFinal = document.getElementById('ocr-cancel');
+            if (ocrCancelFinal) ocrCancelFinal.classList.add('hidden');
         }
 
         function renderSearchResults(results) {
@@ -1385,7 +1729,7 @@
                     try {
                         mergedPdf.encrypt(password, password);
                     } catch (e) {
-                        alert('⚠️ 此瀏覽器模式不支援 PDF 加密，將輸出未加密版本。請用 Adobe Acrobat 加密後分發。');
+                        notifyEncryptUnsupported();
                     }
                 }
                 if (compressMode === 'none') {
@@ -1396,7 +1740,7 @@
 
                 await downloadPdfWithWatermark(pdfBytes, filename + '.pdf');
             } catch (err) {
-                alert('合併失敗：' + err.message);
+                toast(friendlyError(err, '合併失敗'), 'error', 5000);
             }
             hideLoading();
         });
@@ -1459,13 +1803,13 @@
                 const password = document.getElementById('split-password').value;
                 if (password) {
                     try { newPdf.encrypt(password, password); }
-                    catch (e) { alert('⚠️ 此瀏覽器模式不支援 PDF 加密，將輸出未加密版本。'); }
+                    catch (e) { notifyEncryptUnsupported(); }
                 }
 
                 const pdfBytes = await newPdf.save();
                 await downloadPdfWithWatermark(pdfBytes, (document.getElementById('split-filename').value.trim() || 'extracted') + '.pdf');
             } catch (err) {
-                alert('擷取失敗：' + err.message);
+                toast(friendlyError(err, '擷取失敗'), 'error', 5000);
             }
             hideLoading();
         });
@@ -1501,7 +1845,7 @@
                 a.click();
                 URL.revokeObjectURL(url);
             } catch (err) {
-                alert('ZIP 建立失敗：' + err.message);
+                toast(friendlyError(err, 'ZIP 建立失敗'), 'error', 5000);
             }
             hideLoading();
         });
@@ -1521,7 +1865,7 @@
                 }
             });
             if (rejected.length) {
-                alert(`以下檔案無法處理（mammoth 僅支援 .docx）：\n${rejected.join('\n')}\n請用 Word 另存為 .docx`);
+                toast(`⚠️ 以下檔案無法處理（mammoth 僅支援 .docx）：\n${rejected.join('、')}\n請用 Word 另存為 .docx`, 'warn', 6000);
             }
             state.convertFiles = naturalSort([...state.convertFiles, ...accepted]);
             updateConvertList();
@@ -1617,7 +1961,7 @@ zip.file(filename + '.pdf', pdfBlob);
                 a.click();
                 URL.revokeObjectURL(url);
             } catch (err) {
-                alert('轉換失敗：' + err.message);
+                toast(friendlyError(err, '圖片轉換失敗'), 'error', 5000);
             }
             hideLoading();
         });
@@ -1714,7 +2058,7 @@ zip.file(filename + '.pdf', pdfBlob);
                 a.click();
                 URL.revokeObjectURL(url);
             } catch (err) {
-                alert('批次加工失敗：' + err.message);
+                toast(friendlyError(err, '批次加工失敗'), 'error', 5000);
             }
             hideLoading();
         });
@@ -1785,7 +2129,7 @@ zip.file(filename + '.pdf', pdfBlob);
                 else rejected.push(f.name);
             });
             if (rejected.length) {
-                alert(`以下檔案無法處理（不支援此圖片格式）：\n${rejected.join('\n')}\n支援：JPG / PNG / WebP / GIF`);
+                toast(`⚠️ 以下檔案無法處理（不支援此圖片格式）：\n${rejected.join('、')}\n支援：JPG / PNG / WebP / GIF`, 'warn', 6000);
             }
             state.imageFiles = naturalSort([...state.imageFiles, ...accepted]);
             updateImageList();
@@ -1923,11 +2267,11 @@ zip.file(filename + '.pdf', pdfBlob);
                     if (errors.length === total) throw new Error('所有圖片都轉換失敗');
                     if (password) {
                         try { mergedPdf.encrypt(password, password); }
-                        catch (e) { alert('⚠️ 此瀏覽器模式不支援 PDF 加密，將輸出未加密版本。'); }
+                        catch (e) { notifyEncryptUnsupported(); }
                     }
                     const pdfBytes = await mergedPdf.save({ useObjectStreams: true });
                     await downloadPdfWithWatermark(pdfBytes, baseFilename + '.pdf');
-                    if (errors.length) alert(`⚠️ 以下 ${errors.length} 張失敗，已略過：\n${errors.join('\n')}`);
+                    if (errors.length) toast(`⚠️ 以下 ${errors.length} 張失敗,已略過：${errors.slice(0, 3).join('、')}${errors.length > 3 ? '…' : ''}`, 'warn', 5000);
                 } else {
                     // ZIP mode: each image → its own 1-page PDF
                     const watermarkOpts = await getGlobalWatermarkOpts();
@@ -1941,7 +2285,7 @@ zip.file(filename + '.pdf', pdfBlob);
                             const subPdf = await PDFLib.PDFDocument.create();
                             if (password) {
                                 try { subPdf.encrypt(password, password); }
-                                catch (e) { alert('⚠️ 此瀏覽器模式不支援 PDF 加密，將輸出未加密版本。'); }
+                                catch (e) { notifyEncryptUnsupported(); }
                             }
                             const image = mime === 'image/png'
                                 ? await subPdf.embedPng(bytes)
@@ -1976,10 +2320,10 @@ zip.file(filename + '.pdf', pdfBlob);
                     if (errors.length === total) throw new Error('所有圖片都轉換失敗');
                     const content = await zip.generateAsync({ type: 'blob' });
                     downloadBlob(content, `${baseFilename}_${today}.zip`, 'application/zip');
-                    if (errors.length) alert(`⚠️ 以下 ${errors.length} 張失敗，已略過：\n${errors.join('\n')}`);
+                    if (errors.length) toast(`⚠️ 以下 ${errors.length} 張失敗,已略過：${errors.slice(0, 3).join('、')}${errors.length > 3 ? '…' : ''}`, 'warn', 5000);
                 }
             } catch (err) {
-                alert('轉換失敗：' + err.message);
+                toast(friendlyError(err, '圖片轉換失敗'), 'error', 5000);
             }
             hideLoading();
         });
@@ -2016,6 +2360,10 @@ zip.file(filename + '.pdf', pdfBlob);
                     document.getElementById('loading-text').textContent = origText;
                 }
             }
+            // A5: Strip metadata (default-on, aligned with zero-leak stance)
+            if (state.metaStripEnabled) {
+                bytes = await stripPdfMetadata(bytes);
+            }
             downloadBlob(bytes, filename, 'application/pdf');
         }
 
@@ -2036,8 +2384,78 @@ zip.file(filename + '.pdf', pdfBlob);
             localStorage.setItem('pdf-large', document.body.classList.contains('large-text'));
         });
 
-        if (localStorage.getItem('pdf-dark') === 'true') document.body.classList.add('dark');
+        // UX4: Auto-follow system dark mode preference on first visit
+        const storedDark = localStorage.getItem('pdf-dark');
+        if (storedDark === 'true') {
+            document.body.classList.add('dark');
+        } else if (storedDark === null) {
+            // First visit: defer to OS preference
+            try {
+                if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                    document.body.classList.add('dark');
+                }
+            } catch {}
+        }
         if (localStorage.getItem('pdf-large') === 'true') document.body.classList.add('large-text');
+
+        // UX1: First-time tooltips for 3 P0 modes — show once per mode, dismissed by clicking ✕
+        (function showFirstTimeTooltips() {
+            const flags = {
+                'search-keyword': 'tip-search-seen',
+                'redaction-keywords': 'tip-redaction-seen',
+                'watermark-type': 'tip-watermark-seen'
+            };
+            const messages = {
+                'tip-search-seen': '💡 搜尋關鍵字:支援中英文 / 大小寫 / 全字匹配。如果 PDF 係掃描檔,搜尋結果會空白,呢個時候可以啟用本地 OCR(需下載 5MB WASM)。',
+                'tip-redaction-seen': '💡 脫敏關鍵字清單:一行一個關鍵字,支援 # 開頭嘅註解行。可以從搜尋結果直接 transfer,或者下載範本檔。執行後將遮罩並 rasterize,文字無法再被搜尋。',
+                'tip-watermark-seen': '💡 浮水印:5 個英文預設 + 你嘅校徽 PNG。中文字體首次使用需下載 NotoSansTC 子集 (~120KB),之後從 IndexedDB 緩存。'
+            };
+            for (const [anchorId, flagKey] of Object.entries(flags)) {
+                if (localStorage.getItem(flagKey)) continue;
+                const anchor = document.getElementById(anchorId);
+                if (!anchor) continue;
+                anchor.addEventListener('focus', () => {
+                    if (localStorage.getItem(flagKey)) return;
+                    const tip = document.createElement('div');
+                    tip.className = 'first-time-tooltip';
+                    tip.innerHTML = `<span>${messages[flagKey]}</span><button aria-label="關閉提示">✕</button>`;
+                    anchor.parentElement.insertBefore(tip, anchor.nextSibling);
+                    tip.querySelector('button').addEventListener('click', () => {
+                        tip.remove();
+                        localStorage.setItem(flagKey, '1');
+                    });
+                }, { once: true });
+            }
+        })();
+
+        // A5: Metadata auto-strip checkbox sync
+        document.getElementById('meta-strip-enabled').addEventListener('change', (e) => {
+            state.metaStripEnabled = e.target.checked;
+            if (e.target.checked) {
+                toast('🛡️ PDF metadata 自動清除已啟用', 'success', 2000);
+            } else {
+                toast('⚠️ 警告:export 嘅 PDF 將保留原始 metadata(作者 / 軟件 / 日期)', 'warn', 4000);
+            }
+        });
+
+        // A3: When user opens the watermark panel and an image was uploaded in a previous session,
+        // auto-restore the type / name / image from IndexedDB and surface a toast.
+        document.getElementById('btn-global-watermark').addEventListener('click', async () => {
+            const panel = document.getElementById('global-watermark-panel');
+            panel.classList.toggle('hidden');
+            if (!panel.classList.contains('hidden') && document.getElementById('global-watermark-type').value === '') {
+                const cached = await idbGet('watermarkImageData');
+                if (cached && cached.bytes) {
+                    document.getElementById('global-watermark-type').value = 'image:uploaded';
+                    state.globalWatermarkType = 'image:uploaded';
+                    state.globalWatermarkImageName = cached.name;
+                    document.getElementById('global-watermark-image-info').textContent = `♻️ 已自動還原:${cached.name}`;
+                    document.getElementById('global-watermark-upload-row').classList.remove('hidden');
+                    state.watermarkImageRecalled = true;
+                    toast(`♻️ 已自動還原上次的校徽:${cached.name}`, 'success', 2500);
+                }
+            }
+        });
 
         // ─── Anti-accidental close ───────────────────────────
         let closeGuard = false;
@@ -2184,6 +2602,7 @@ zip.file(filename + '.pdf', pdfBlob);
                 globalWatermarkEnabled: document.getElementById('global-watermark-enabled')?.checked ?? false,
                 globalWatermarkType: document.getElementById('global-watermark-type')?.value || '',
                 globalWatermarkOpacity: parseInt(document.getElementById('global-watermark-opacity')?.value || '15', 10),
+                metaStripEnabled: document.getElementById('meta-strip-enabled')?.checked ?? true,
                 savedAt: Date.now()
             };
             try {
@@ -2263,6 +2682,14 @@ zip.file(filename + '.pdf', pdfBlob);
                 document.getElementById('global-watermark-opacity').value = meta.globalWatermarkOpacity;
                 state.globalWatermarkOpacity = meta.globalWatermarkOpacity;
                 document.getElementById('global-watermark-opacity-display').textContent = `${meta.globalWatermarkOpacity}%`;
+            }
+            // A5: Metadata auto-strip
+            if (meta.metaStripEnabled !== undefined) {
+                const el = document.getElementById('meta-strip-enabled');
+                if (el) {
+                    el.checked = meta.metaStripEnabled;
+                    state.metaStripEnabled = meta.metaStripEnabled;
+                }
             }
             updateSearchButton();
             updateRedactionKeywordCount();
