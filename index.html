@@ -519,6 +519,16 @@
                         <button id="redaction-download-template" class="text-sm text-violet-600 hover:text-violet-800 underline" type="button">
                             📥 下載範本
                         </button>
+                        <!-- F6: Load + manage saved templates (IndexedDB) -->
+                        <details id="redaction-templates-menu" class="relative">
+                            <summary class="text-sm text-violet-600 hover:text-violet-800 underline cursor-pointer list-none">📂 載入範本</summary>
+                            <div id="redaction-templates-dropdown" class="absolute z-20 left-0 mt-1 w-72 max-h-64 overflow-y-auto bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg p-2 text-sm">
+                                <p class="text-xs text-gray-500 px-2 py-1" id="redaction-templates-empty">尚未儲存任何範本</p>
+                            </div>
+                        </details>
+                        <button id="redaction-save-template" class="text-sm text-violet-600 hover:text-violet-800 underline" type="button">
+                            💾 儲存為範本
+                        </button>
                     </div>
                     <p class="text-xs text-gray-500 mb-3" id="redaction-keyword-count">0 個關鍵字</p>
 
@@ -985,6 +995,131 @@ A123456(7)
             downloadBlob(blob, 'redaction_template.txt');
             toast('✅ 範本已下載', 'success', 2000);
         });
+
+        // F6: Persisted keyword list templates (IndexedDB)
+        // Schema: IDB key 'redactionTemplates' = { name, content, count, savedAt }[]
+        // Each entry is small (text only, no binary) so quota risk is negligible.
+        // Separate key from session restore files so idbClear() doesn't wipe templates.
+        const TEMPLATES_KEY = 'redactionTemplates';
+
+        async function loadRedactionTemplates() {
+            return (await idbGet(TEMPLATES_KEY)) || [];
+        }
+
+        async function saveRedactionTemplates(list) {
+            await idbPut(TEMPLATES_KEY, list);
+        }
+
+        function effectiveKeywordCount(content) {
+            return content.split('\n').map(l => l.trim()).filter(l => l.length > 0 && !l.startsWith('#')).length;
+        }
+
+        function renderRedactionTemplatesDropdown() {
+            loadRedactionTemplates().then(list => {
+                const dd = document.getElementById('redaction-templates-dropdown');
+                if (!dd) return;
+                dd.innerHTML = '';
+                if (list.length === 0) {
+                    const p = document.createElement('p');
+                    p.className = 'text-xs text-gray-500 px-2 py-1';
+                    p.textContent = '尚未儲存任何範本';
+                    dd.appendChild(p);
+                    return;
+                }
+                // Sort by savedAt desc
+                list.slice().sort((a, b) => b.savedAt - a.savedAt).forEach(tpl => {
+                    const row = document.createElement('div');
+                    row.className = 'flex items-center justify-between gap-2 px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded';
+                    const info = document.createElement('div');
+                    info.className = 'flex-1 min-w-0 cursor-pointer';
+                    info.innerHTML = `<div class="font-medium text-gray-800 dark:text-gray-100 truncate">${escapeHtml(tpl.name)}</div><div class="text-xs text-gray-500">${tpl.count} 個關鍵字 · ${new Date(tpl.savedAt).toLocaleDateString('zh-HK')}</div>`;
+                    info.addEventListener('click', () => applyRedactionTemplate(tpl));
+                    const del = document.createElement('button');
+                    del.type = 'button';
+                    del.className = 'text-red-600 hover:text-red-800 text-xs px-1';
+                    del.textContent = '🗑';
+                    del.title = `刪除「${tpl.name}」`;
+                    del.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        deleteRedactionTemplate(tpl.name);
+                    });
+                    row.appendChild(info);
+                    row.appendChild(del);
+                    dd.appendChild(row);
+                });
+            });
+        }
+
+        function applyRedactionTemplate(tpl) {
+            const ta = document.getElementById('redaction-keywords');
+            ta.value = tpl.content;
+            updateRedactionKeywordCount();
+            updateRedactionButton();
+            renderRedactionDiffPreview();
+            // Close dropdown
+            const menu = document.getElementById('redaction-templates-menu');
+            if (menu) menu.removeAttribute('open');
+            toast(`✅ 已載入範本「${tpl.name}」（${tpl.count} 個關鍵字）`, 'success');
+        }
+
+        async function deleteRedactionTemplate(name) {
+            const list = await loadRedactionTemplates();
+            const idx = list.findIndex(t => t.name === name);
+            if (idx === -1) return;
+            if (!confirm(`確定刪除範本「${name}」？此操作無法復原。`)) return;
+            list.splice(idx, 1);
+            await saveRedactionTemplates(list);
+            renderRedactionTemplatesDropdown();
+            toast(`🗑 已刪除範本「${name}」`, 'info', 2000);
+        }
+
+        async function saveCurrentAsTemplate() {
+            const ta = document.getElementById('redaction-keywords');
+            const content = ta.value;
+            const count = effectiveKeywordCount(content);
+            if (count === 0) {
+                toast('⚠️ 沒有關鍵字可以儲存。先輸入至少一個非註解嘅關鍵字。', 'warn', 3500);
+                return;
+            }
+            const defaultName = `範本 ${new Date().toLocaleDateString('zh-HK')}`;
+            const name = prompt('為呢個範本命名：', defaultName);
+            if (name === null) return;  // user cancelled
+            const trimmed = name.trim();
+            if (!trimmed) {
+                toast('⚠️ 範本名稱不可空白', 'warn', 2500);
+                return;
+            }
+            if (trimmed.length > 40) {
+                toast('⚠️ 範本名稱太長（上限 40 字）', 'warn', 2500);
+                return;
+            }
+            const list = await loadRedactionTemplates();
+            const existingIdx = list.findIndex(t => t.name === trimmed);
+            if (existingIdx !== -1) {
+                if (!confirm(`已經有同名範本「${trimmed}」。覆蓋佢？`)) return;
+                list[existingIdx] = { name: trimmed, content, count, savedAt: Date.now() };
+            } else {
+                list.push({ name: trimmed, content, count, savedAt: Date.now() });
+            }
+            try {
+                await saveRedactionTemplates(list);
+                renderRedactionTemplatesDropdown();
+                toast(`✅ 已儲存範本「${trimmed}」（${count} 個關鍵字）`, 'success');
+            } catch (err) {
+                // QuotaExceededError etc
+                toast(`⚠️ 儲存失敗：${err.message || err}`, 'error', 5000);
+            }
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            const menu = document.getElementById('redaction-templates-menu');
+            if (menu && menu.hasAttribute('open') && !menu.contains(e.target)) {
+                menu.removeAttribute('open');
+            }
+        });
+
+        document.getElementById('redaction-save-template').addEventListener('click', saveCurrentAsTemplate);
 
         // F1: Render side-by-side preview of keyword matches across PDF pages
         async function renderRedactionDiffPreview() {
@@ -2695,6 +2830,7 @@ zip.file(filename + '.pdf', pdfBlob);
             updateRedactionKeywordCount();
             updateWatermarkButton();
             updateRedactionButton();
+            renderRedactionTemplatesDropdown();  // F6: restore template dropdown
         }
 
         function restoreActiveTab(mode) {
