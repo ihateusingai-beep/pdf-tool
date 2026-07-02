@@ -1,0 +1,10 @@
+# Test-only dependencies (not part of the production single-file SPA)
+node_modules/
+
+# Test output PDFs and downloaded artifacts
+results/
+
+# Editor / OS noise
+.DS_Store
+*.swp
+*.swo
