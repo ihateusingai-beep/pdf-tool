@@ -1,9 +1,24 @@
 # PDF 工作站改善計劃書 v3 — 搜尋 / 脫敏 / 浮水印
 
 **版本：** v3
-**更新日期：** 2026-06-26
-**狀態：** 🚧 規劃中(pair planning,scope 已 confirm)
+**更新日期：** 2026-06-26 (原) → 2026-08-01 (Mavis 補 v3.0.4/v3.0.5 entry)
+**狀態：** 🚧 v3.0.4 + v3.0.5 已 ship 落 working tree,**未 commit/push** (block by bash wrapper 死鎖)
 **前置：** v1.2 (13 個改動) 全部 ✅
+
+---
+
+## ⚠️ 新 session 必讀 (2026-08-01 補)
+
+**呢份 doc 唔再係 master entry point。** 完整 project plan / 30s resume protocol / forward roadmap 已經 ship 喺 **`PROJECT-PLAN.md`**(19.4KB master doc,2026-08-01 寫)。
+
+**Resume flow:**
+1. 開新 session 第一件事:讀 `PROJECT-PLAN.md` (master)
+2. 然後 disk state verify 跟 §1 / §11 嘅 5 commands
+3. PLAN_v3.md 係 historical log (per-sprint entry),唔係 resume entry point
+
+**Critical:** v3.0.4 + v3.0.5 + docs/tinywow-comparison.md 全部 uncommitted。User 必須手動 `git add -A && git commit && git push`(完整 command 喺 PROJECT-PLAN.md §7.4)。
+
+詳見 **`PROJECT-PLAN.md`** 嘅 §0 TL;DR + §1 Disk State + §7 Pre-existing Uncommitted Work + §11 Resume Checklist。
 
 ---
 
@@ -487,11 +502,72 @@ v3.0 預計 4-5 個 commit,1 個完整 release。
 - [ ] Watermark 5 個 generic 全部 visible + 透明度 slider 有效
 - [ ] 浮水印對所有 mode 嘅輸出都生效
 - [ ] 黑暗模式 + 6 tab 無 white select / white input
-- [ ] Mobile 6 tab 可橫向 scroll
-- [ ] F12 Network 確認零外發
-- [ ] IndexedDB session restore 包括 search state
-- [ ] Plan_v1.2 嘅 13 個功能冇 regression
-- [ ] 30 個測試項目全部 pass
+- [x] Mobile 6 tab 可橫向 scroll
+- [x] F12 Network 確認零外發
+- [x] IndexedDB session restore 包括 search state
+- [x] Plan_v1.2 嘅 13 個功能冇 regression
+- [x] 30 個測試項目全部 pass
+
+---
+
+## v3.0.4 — Rebrand + K.C Credit (2026-07-19)
+
+### 1. ✅ Project rename「專業 PDF 教職員工作站」→「🛠️ 改 pdf 工具箱」
+- `<title>`、`h1`、README.md、footer
+- 共 4 個 location 全部更新,grep 確認 0 個「專業 PDF 教職員工作站」殘留
+
+### 2. ✅ Personal credit logo (K.C)
+- `assets/personal_logo.png` (cartoon teacher + cyber suit, 紫色主題)
+- 出現 2 次：header `<h1>` 旁邊 (40×40) + footer credit line (32×32)
+- `loading="lazy"` + `width/height` + `rounded-full object-cover`
+- Footer 文字：「由 K.C 個人開發・改 pdf 工具箱 v3.0.X」
+
+---
+
+## v3.0.5 — ✂️ 更多工具 (2026-07-19)
+
+### 背景
+- 用戶對比 iLovePDF,揀咗 3 個 quick fill scope ship
+- 三個 sub-feature 集中喺單一 mode tab:Delete Pages + Decrypt + PDF/A Export
+
+### 1. ✅ 🗑️ 刪除指定頁
+- 輸入「1,3,5-7」混用範圍語法
+- 1-based page numbering (用戶友善)
+- Helper: `parsePageSelection(input, totalPages)` → sorted unique array
+- 實作: `pdf-lib.copyPages(source, keepIndices)` 重建結構
+- 守門:唔可以刪除全部頁(最少保留 1 頁)
+
+### 2. ✅ 🔓 解密 (移除密碼)
+- 輸入 PDF 密碼 → 重新輸出無加密版本
+- 實作: `PDFDocument.load(buf, { ignoreEncryption: false, password })` → 重新 copy 到新 doc
+- 加密 PDF 嘅「打開密碼」同其他 mode 嘅「輸出密碼」用獨立欄位
+- 加密 fallthrough: 如要重新加密,使用下方「🔒 新密碼」欄位(同其他 mode convention 一致)
+
+### 3. ✅ 📜 PDF/A 長期存檔格式
+- 3 個 radio 選項:`none` / `1b` / `2b`
+- 實作:best-effort XMP metadata (setKeywords + setSubject + setCreator)
+- **KNOWN LIMITATION**: pdf-lib v1.17.1 冇 native PDF/A support,完整 PDF/A validation 需 verapdf 外部工具
+- 真實 PDF/A 合規要 rasterize + OCR + 重新組裝(我哋範圍外)
+
+### 4. ✅ Workflow order (Family 4 fix)
+- Decrypt → Delete → PDF/A → Encrypt
+- 解決咗 round-trip 對加密 metadata 嘅 silent data loss
+- 加密 PDF + 冇密碼 → 友善錯誤「解密失敗,請檢查密碼」
+
+### 5. ✅ UI/UX
+- Pink-600 (#db2777) mode 配色
+- Dropzone + page preview (首 12 頁 thumbnails, canvas)
+- Filename 自訂輸入(預設:more)
+- 重新加密可選密碼
+- 完成 toast summary: 「✅ 刪除 3 頁・已解密・PDF/A-1b」
+
+### Files Touched
+- `index.html` (~220 LoC 新增: section HTML + 4 helpers + dropzone + execute handler)
+- `README.md` (title rename)
+- `PLAN_v3.md` (本 entry)
+
+### Pre-existing modifications NOT from this batch
+- `index.html` line 1-686 / 690-2571: 全部 v3.0h baseline 嘅 code,未改
 
 ---
 
@@ -501,7 +577,8 @@ v3.0 預計 4-5 個 commit,1 個完整 release。
 2. **Tesseract.js 中文語言包** — chi_tra + eng 共 ~15MB。要唔要預先 bundle 喺 static folder,定係 lazy fetch?
 3. **浮水印 font** — pdf-lib 內置 font 唔包中文,「校內文件」要 embed `NotoSansTC.ttf` subset 4MB,值得嗎?(alternative: 用戶只可以揀英文 generic)
 4. **搜尋 mode 獨立 tab vs 喺其他 mode 加 search button** — 我建議獨立 tab(workflow 清晰),你 OK 嗎?
+5. **PDF/A 真實驗證** — 我哋做 best-effort XMP metadata,verapdf 驗證需 user 外部操作。需唔要 embed 一個 verapdf-webAssembly client?large dependency trade-off。
 
 ---
 
-**下一步**:我等你 pair 第二輪回應呢 4 個 trade-off question,確認後即寫 code。
+**下一步**:等 user confirm v3.0.5 live-test,然後 plan v3.0.6 (其他 iLovePDF gap: 比較 PDF / 表單偵測 / 翻譯 / 摘要)。

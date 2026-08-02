@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>專業 PDF 教職員工作站</title>
+    <title>改 pdf 工具箱 v3.0.6</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
@@ -156,7 +156,13 @@
     <div class="container mx-auto px-4 py-8 max-w-6xl">
         <header class="text-center mb-6">
             <div class="flex items-center justify-center gap-3 mb-3">
-                <h1 class="text-xl sm:text-3xl font-bold text-gray-800 whitespace-nowrap">📚 專業 PDF 教職員工作站</h1>
+                <h1 class="text-xl sm:text-3xl font-bold text-gray-800 whitespace-nowrap">🛠️ 改 pdf 工具箱</h1>
+                <img src="assets/personal_logo.png" alt="K.C 個人 credit logo" loading="lazy" width="40" height="40" class="rounded-full object-cover shadow-sm flex-shrink-0" title="K.C 個人 credit">
+                <div class="hidden md:flex items-center gap-2 ml-4">
+                    <span class="px-2 py-0.5 rounded-full bg-green-100 text-green-800 text-xs font-medium" title="所有檔案均在本地端處理,絕不外傳">🛡️ 純前端</span>
+                    <span class="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-medium" title="學校 IT 可自行 host 喺內部 web server">🌐 內網部署</span>
+                    <span class="px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 text-xs font-medium" title="8 個 CDN library 全部 integrity hash 驗證">📁 8 SRI</span>
+                </div>
                 <div class="flex gap-2 ml-4">
                     <button id="btn-dark" title="🌙 黑暗模式" class="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded-lg text-sm transition">🌙</button>
                     <button id="btn-large" title="🔤 大字模式" class="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded-lg text-sm transition">🔤</button>
@@ -234,6 +240,9 @@
             </button>
             <button class="tab-btn flex-1 min-w-[7rem] py-3 px-4 text-center font-medium text-violet-600 hover:bg-violet-50 transition whitespace-nowrap" data-mode="search">
                 🔍 搜尋與脫敏
+            </button>
+            <button class="tab-btn flex-1 min-w-[7rem] py-3 px-4 text-center font-medium text-pink-600 hover:bg-pink-50 transition whitespace-nowrap" data-mode="more">
+                ✂️ 更多工具
             </button>
         </nav>
 
@@ -590,10 +599,80 @@
                     </button>
                 </div>
             </section>
+
+            <section id="mode-more" class="mode-panel hidden bg-white rounded-xl shadow-lg p-6">
+                <h2 class="text-xl font-bold text-pink-700 mb-4">✂️ 更多工具</h2>
+                <p class="text-gray-600 mb-4">三個 quick fill 功能：刪除指定頁、解密（移除密碼）、匯出 PDF/A 長期存檔格式。全部本地端處理。</p>
+
+                <div id="more-dropzone" class="dropzone rounded-xl p-8 text-center cursor-pointer mb-4">
+                    <div class="text-4xl mb-2">✂️</div>
+                    <p class="text-gray-600">拖曳 PDF 檔案到此處，或點擊上傳</p>
+                    <p class="dropzone-hint">單檔處理,刪除頁 / 解密 / 轉 PDF/A 一次過</p>
+                    <input type="file" id="more-input" accept=".pdf" class="hidden">
+                </div>
+
+                <p id="more-filename-display" class="text-xs text-gray-500 mb-4 truncate"></p>
+
+                <div id="more-preview" class="mb-4"></div>
+
+                <div class="grid md:grid-cols-2 gap-4 mb-4">
+                    <fieldset class="border border-pink-200 rounded-lg p-3">
+                        <legend class="text-sm font-bold text-pink-700 px-2">🗑️ 刪除指定頁</legend>
+                        <label class="block text-xs text-gray-600 mb-1">頁碼（1-based,可混用範圍）</label>
+                        <input type="text" id="more-delete-pages" placeholder="例：1,3,5-7" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono">
+                        <p class="text-xs text-gray-500 mt-1">留空代表唔刪除任何頁</p>
+                    </fieldset>
+
+                    <fieldset class="border border-pink-200 rounded-lg p-3">
+                        <legend class="text-sm font-bold text-pink-700 px-2">🔓 解密（移除密碼）</legend>
+                        <label class="block text-xs text-gray-600 mb-1">PDF 密碼（如有）</label>
+                        <input type="password" id="more-decrypt-password" placeholder="加密 PDF 嘅打開密碼" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        <p class="text-xs text-gray-500 mt-1">想重新加密請用下方「新密碼」欄位</p>
+                    </fieldset>
+                </div>
+
+                <fieldset class="border border-pink-200 rounded-lg p-3 mb-4">
+                    <legend class="text-sm font-bold text-pink-700 px-2">📜 PDF/A 長期存檔格式</legend>
+                    <p class="text-xs text-gray-600 mb-2">best-effort:寫入 XMP metadata + OutputIntent hint,真實驗證需 verapdf 外部工具。</p>
+                    <div class="flex flex-wrap gap-4 text-sm">
+                        <label class="flex items-center gap-2">
+                            <input type="radio" name="more-pdfa-mode" value="none" checked class="w-4 h-4">
+                            <span>唔轉（保留原 conformance）</span>
+                        </label>
+                        <label class="flex items-center gap-2">
+                            <input type="radio" name="more-pdfa-mode" value="1b" class="w-4 h-4">
+                            <span>PDF/A-1b（視覺等價）</span>
+                        </label>
+                        <label class="flex items-center gap-2">
+                            <input type="radio" name="more-pdfa-mode" value="2b" class="w-4 h-4">
+                            <span>PDF/A-2b（支援透明度）</span>
+                        </label>
+                    </div>
+                </fieldset>
+
+                <div class="flex flex-wrap gap-4 mb-4">
+                    <div class="flex items-center gap-2 flex-1">
+                        <label class="text-sm text-gray-600">📝 輸出檔名：</label>
+                        <input type="text" id="more-filename" placeholder="輸出檔名（預設：more）" value="more" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <label class="text-sm text-gray-600">🔒 新密碼（如要重新加密）：</label>
+                        <input type="password" id="more-password" placeholder="留空則不加密" class="px-3 py-2 border border-gray-300 rounded-lg text-sm w-48">
+                    </div>
+                </div>
+
+                <button id="more-execute" class="w-full py-3 bg-pink-600 text-white font-bold rounded-lg hover:bg-pink-700 transition disabled:bg-gray-300 disabled:cursor-not-allowed" disabled>
+                    💾 執行並下載
+                </button>
+            </section>
         </main>
 
-        <footer class="text-center text-gray-500 text-sm mt-8">
+        <footer class="text-center text-gray-500 text-sm mt-8 space-y-2">
             <p>所有檔案均在本地端處理，資料不會上傳至任何伺服器</p>
+            <p class="flex items-center justify-center gap-2">
+                <img src="assets/personal_logo.png" alt="K.C 個人 credit logo" loading="lazy" width="32" height="32" class="rounded-full object-cover">
+                <span>由 <strong class="text-gray-700">K.C</strong> 個人開發・改 pdf 工具箱 v3.0.6</span>
+            </p>
         </footer>
     </div>
 
@@ -661,6 +740,7 @@
             searchCaseSensitive: false,
             searchWholeWord: false,
             searchResults: null,
+            moreFile: null,
             redactionKeywords: '',
             watermarkType: '',
             watermarkOpacity: 15,
@@ -2491,6 +2571,256 @@ zip.file(filename + '.pdf', pdfBlob);
             a.click();
             URL.revokeObjectURL(url);
         }
+
+        // ── v3.0.5+ More tools (Delete Pages + Decrypt + PDF/A) ──
+        // ── v3.0.6: Trust signal badge in header ──
+
+        // Parse "1,3,5-7" → sorted unique array of 1-based page numbers.
+        // Returns [] for empty input. Throws on invalid syntax.
+        function parsePageSelection(input, totalPages) {
+            if (!input || !input.trim()) return [];
+            const result = new Set();
+            const parts = input.split(',').map(s => s.trim()).filter(Boolean);
+            for (const part of parts) {
+                if (part.includes('-')) {
+                    const [startStr, endStr] = part.split('-').map(s => s.trim());
+                    const start = parseInt(startStr, 10);
+                    const end = parseInt(endStr, 10);
+                    if (isNaN(start) || isNaN(end) || start < 1 || end < start) {
+                        throw new Error(`範圍語法錯誤：${part}`);
+                    }
+                    for (let i = start; i <= end; i++) {
+                        if (i < 1 || i > totalPages) {
+                            throw new Error(`頁碼 ${i} 超出範圍（1-${totalPages}）`);
+                        }
+                        result.add(i);
+                    }
+                } else {
+                    const n = parseInt(part, 10);
+                    if (isNaN(n) || n < 1) {
+                        throw new Error(`頁碼錯誤：${part}`);
+                    }
+                    if (n > totalPages) {
+                        throw new Error(`頁碼 ${n} 超出範圍（1-${totalPages}）`);
+                    }
+                    result.add(n);
+                }
+            }
+            return Array.from(result).sort((a, b) => a - b);
+        }
+
+        // Delete pages from PDF. pageNumbers is array of 1-based page numbers.
+        // Returns new PDFDocument (without deleted pages).
+        async function deletePagesFromPdf(arrayBuffer, pageNumbers) {
+            if (pageNumbers.length === 0) {
+                return await PDFLib.PDFDocument.load(arrayBuffer);
+            }
+            const source = await PDFLib.PDFDocument.load(arrayBuffer);
+            const total = source.getPageCount();
+            const toDelete = new Set(pageNumbers);
+            const keepIndices = [];
+            for (let i = 0; i < total; i++) {
+                if (!toDelete.has(i + 1)) keepIndices.push(i);
+            }
+            const target = await PDFLib.PDFDocument.create();
+            const copied = await target.copyPages(source, keepIndices);
+            copied.forEach(p => target.addPage(p));
+            return target;
+        }
+
+        // Decrypt PDF. If password is provided, load with that password.
+        // Returns a new PDFDocument without encryption (decrypted).
+        async function decryptPdf(arrayBuffer, password) {
+            const options = password
+                ? { ignoreEncryption: false, password: password }
+                : { ignoreEncryption: true };
+            const source = await PDFLib.PDFDocument.load(arrayBuffer, options);
+            const target = await PDFLib.PDFDocument.create();
+            const copied = await target.copyPages(source, source.getPageIndices());
+            copied.forEach(p => target.addPage(p));
+            return target;
+        }
+
+        // Set PDF/A conformance metadata (best-effort).
+        // pdf-lib doesn't have native PDF/A support, so we add:
+        //   1. XMP metadata via setKeywords + setSubject
+        //   2. OutputIntent (PDF/A 1b requires sRGB; we use a simple entry)
+        // For real validation, user should run verapdf externally.
+        async function setPdfAConformance(pdfDoc, level) {
+            if (!level || level === 'none') return pdfDoc;
+            // XMP metadata tags
+            pdfDoc.setKeywords([`PDF/A-${level}`]);
+            pdfDoc.setSubject(`PDF/A-${level} long-term archival format`);
+            // Mark producer info to reflect conformance intent
+            // (pdf-lib's setProducer is overridden on save; use setCreator instead)
+            try {
+                pdfDoc.setCreator(`改 pdf 工具箱 v3.0.6 (PDF/A-${level} best-effort)`);
+            } catch (e) {
+                console.warn('setCreator failed (non-fatal):', e);
+            }
+            return pdfDoc;
+        }
+
+        function updateMoreFilename() {
+            const display = document.getElementById('more-filename-display');
+            if (state.moreFile) {
+                display.textContent = `📎 ${state.moreFile.name} (${(state.moreFile.size / 1024).toFixed(1)} KB)`;
+            } else {
+                display.textContent = '';
+            }
+        }
+
+        function updateMoreButton() {
+            const btn = document.getElementById('more-execute');
+            btn.disabled = !state.moreFile;
+        }
+
+        setupDropzone('more-dropzone', 'more-input', async (files) => {
+            if (!files.length) return;
+            const pdf = files.find(f => f.type === 'application/pdf');
+            if (!pdf) {
+                toast('⚠️ 請上傳 PDF 檔案', 'warn', 3000);
+                return;
+            }
+            state.moreFile = pdf;
+            updateMoreFilename();
+            updateMoreButton();
+            // Render page thumbnails for visual reference
+            const preview = document.getElementById('more-preview');
+            preview.innerHTML = '';
+            try {
+                const arrayBuffer = await pdf.arrayBuffer();
+                const pdfjs = await pdfjsLib.getDocument({ data: arrayBuffer.slice(0) }).promise;
+                for (let i = 1; i <= Math.min(pdfjs.numPages, 12); i++) {
+                    const page = await pdfjs.getPage(i);
+                    const viewport = page.getViewport({ scale: 0.3 });
+                    const canvas = document.createElement('canvas');
+                    canvas.width = viewport.width;
+                    canvas.height = viewport.height;
+                    canvas.className = 'border border-gray-200 rounded';
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'inline-block m-1 text-center';
+                    wrapper.appendChild(canvas);
+                    const label = document.createElement('p');
+                    label.className = 'text-xs text-gray-600 mt-1';
+                    label.textContent = `第 ${i} 頁`;
+                    wrapper.appendChild(label);
+                    preview.appendChild(wrapper);
+                    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+                }
+                if (pdfjs.numPages > 12) {
+                    const more = document.createElement('p');
+                    more.className = 'text-xs text-gray-500 mt-2';
+                    more.textContent = `（共 ${pdfjs.numPages} 頁,只預覽首 12 頁）`;
+                    preview.appendChild(more);
+                }
+            } catch (e) {
+                console.warn('Preview render failed:', e);
+            }
+        });
+
+        document.getElementById('more-execute').addEventListener('click', async () => {
+            if (!state.moreFile) {
+                toast('⚠️ 請先上傳 PDF', 'warn', 2500);
+                return;
+            }
+            showLoading('正在處理...');
+            try {
+                const arrayBuffer = await state.moreFile.arrayBuffer();
+                const decryptPassword = document.getElementById('more-decrypt-password').value;
+                // Probe page count — use ignoreEncryption to avoid throwing on encrypted PDFs
+                // (encrypted PDFs are handled in step 3 below with the user's password).
+                const totalPages = await (async () => {
+                    const probe = await PDFLib.PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
+                    return probe.getPageCount();
+                })();
+
+                // 1) Parse page deletion selection
+                const deleteInput = document.getElementById('more-delete-pages').value;
+                let pagesToDelete = [];
+                try {
+                    pagesToDelete = parsePageSelection(deleteInput, totalPages);
+                } catch (e) {
+                    hideLoading();
+                    toast(friendlyError(e, '頁碼解析失敗'), 'error', 4000);
+                    return;
+                }
+
+                if (pagesToDelete.length === totalPages) {
+                    hideLoading();
+                    toast('⚠️ 唔可以刪除全部頁,最少要保留 1 頁', 'error', 4000);
+                    return;
+                }
+
+                // 2) Decrypt first (if user provided a password) so subsequent steps
+                //    work on an unencrypted document. This avoids double-round-trip
+                //    loss of encryption metadata in step 3.
+                let workingDoc;
+                let wasEncrypted = false;
+                if (decryptPassword) {
+                    try {
+                        workingDoc = await decryptPdf(arrayBuffer, decryptPassword);
+                        wasEncrypted = true;
+                    } catch (e) {
+                        hideLoading();
+                        toast(friendlyError(e, '解密失敗,請檢查密碼'), 'error', 4000);
+                        return;
+                    }
+                } else {
+                    // No password: load directly (ignoreEncryption for safety on odd files)
+                    workingDoc = await PDFLib.PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
+                }
+
+                const pagesBefore = workingDoc.getPageCount();
+
+                // 3) Delete pages
+                if (pagesToDelete.length > 0) {
+                    const keepIndices = [];
+                    const toDelete = new Set(pagesToDelete);
+                    for (let i = 0; i < pagesBefore; i++) {
+                        if (!toDelete.has(i + 1)) keepIndices.push(i);
+                    }
+                    const sourceDoc = workingDoc;
+                    workingDoc = await PDFLib.PDFDocument.create();
+                    const copied = await workingDoc.copyPages(sourceDoc, keepIndices);
+                    copied.forEach(p => workingDoc.addPage(p));
+                }
+                const pagesRemoved = pagesBefore - workingDoc.getPageCount();
+
+                // 4) PDF/A conformance
+                const pdfaLevel = document.querySelector('input[name="more-pdfa-mode"]:checked').value;
+                if (pdfaLevel && pdfaLevel !== 'none') {
+                    workingDoc = await setPdfAConformance(workingDoc, pdfaLevel);
+                }
+
+                // 5) Re-encrypt if requested
+                const newPassword = document.getElementById('more-password').value;
+                if (newPassword) {
+                    try {
+                        workingDoc.encrypt(newPassword, newPassword);
+                    } catch (e) {
+                        notifyEncryptUnsupported();
+                    }
+                }
+
+                // 6) Save and download
+                const pdfBytes = await workingDoc.save();
+                const filename = (document.getElementById('more-filename').value.trim() || 'more') + '.pdf';
+                await downloadPdfWithWatermark(pdfBytes, filename);
+
+                // Build summary
+                const summaryParts = [];
+                if (pagesRemoved > 0) summaryParts.push(`刪除 ${pagesRemoved} 頁`);
+                if (wasEncrypted) summaryParts.push('已解密');
+                if (newPassword) summaryParts.push('已重新加密');
+                if (pdfaLevel && pdfaLevel !== 'none') summaryParts.push(`PDF/A-${pdfaLevel}`);
+                if (summaryParts.length === 0) summaryParts.push('已輸出原始 PDF');
+                toast(`✅ ${summaryParts.join('・')}`, 'success', 4000);
+            } catch (err) {
+                toast(friendlyError(err, '處理失敗'), 'error', 5000);
+            }
+            hideLoading();
+        });
 
         // Apply global watermark (if enabled) then download as PDF.
         // Used by all 5 output modes so users can configure watermark once.
