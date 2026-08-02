@@ -581,4 +581,74 @@ v3.0 預計 4-5 個 commit,1 個完整 release。
 
 ---
 
-**下一步**:等 user confirm v3.0.5 live-test,然後 plan v3.0.6 (其他 iLovePDF gap: 比較 PDF / 表單偵測 / 翻譯 / 摘要)。
+## v3.0.6 — Rebrand + Q3 trust signal badge (2026-08-02)
+
+### 1. ✅ 🛠️ 改 pdf 工具箱 rebrand (v3.0.4 carry-over, formalised)
+- Title: `改 pdf 工具箱 v3.0.6` (K.C 個人 brand)
+- Header K.C logo (40x40 rounded-full)
+- Footer 「由 K.C 個人開發」credit line
+
+### 2. ✅ 🛡️ Q3 Trust signal badge (header 3 pill)
+- 🛡️ 純前端 (green) — 零外流 stance
+- 🌐 內網部署 (blue) — 學校 IT self-host ready
+- 📁 8 SRI (purple) — 8 CDN library integrity hash
+- 對標 TinyWow / iLovePDF / PDFgear 嘅 unique value prop
+- `hidden md:flex` — mobile 自動 collapse
+- a11y: 用 native `title=` attribute, screen reader compatible
+
+### 3. ✅ Wrapper 死鎖永久 fix (Q4)
+- 透過 git worktree 喺舊 path 開 mavis-bridge branch
+- Scripts: `scripts/setup-worktree.sh` (76 lines, ready-to-run)
+- Docs: `docs/desktop-wrapper-fix.md` (3 method 比較 + recon finding)
+
+### 4. ✅ Phase 1 research doc ship
+- `docs/tinywow-comparison.md` (18.4KB) — 47 TinyWow PDF tools gap matrix
+- 11 sections: 公司面 / inventory / UX / 對標 / 4 suite / 3 UX learning / Phase 2 / positioning / cross-project lesson
+
+---
+
+## v3.0.7 — Word/Excel 轉 PDF quality (2026-08-02)
+
+### 1. ✅ Excel (.xlsx) 支援 — major new feature
+- **新 CDN:** SheetJS `xlsx@0.18.5` (~800KB)
+- **Helper:** `convertXlsxToHtml(file)` — XLSX.read + sheet_to_html 逐 sheet render
+- **Accept extend:** `.docx, .xlsx, .txt, .rtf` (4 types now)
+- **KNOWN LIMITATIONS:** 公式 render 為 cached value 唔 re-evaluate, complex formatting (merged cells / 顏色) lost
+- **Trade-off:** Client-side quality < server-side, 但保持零外流 stance
+
+### 2. ✅ DOCX quality 提升
+- HTML CSS table: 加 padding 6-10px, header background #f1f5f9, zebra striping, 邊框 #cbd5e1
+- html2canvas scale 2 → 3 (high DPI)
+- h1/h2/h3 顏色統一 #0c4a6e
+- margin 15 → 12 (更貼邊, 內容 area 更大)
+- font-size 14 → 13 (line-height 1.7 配合)
+
+### 3. ✅ Type routing refactor
+- 抽出 `convertFileToHtml(file)` helper, ext-based switch
+- 4 種 type: txt/rtf (direct read), docx (mammoth), xlsx (SheetJS)
+- F4 fix: try/catch per file, failures[] array, continue 落 1 個 file, 最後 warn toast
+- 唔再 silent fallthrough
+
+### 4. ✅ UX improvement
+- 成功 toast: `✅ 已轉換 N 個檔案` (success green)
+- 部分失敗 toast: `⚠️ N/M 個成功。失敗: ...` (warn amber)
+- 全部失敗: throw error 走 friendlyError path
+
+### Files Touched (v3.0.7)
+- `index.html` line 6: title v3.0.7
+- `index.html` line 15: SheetJS CDN
+- `index.html` line 335-355: convert panel HTML (h2 + accept + warning)
+- `index.html` line 2080-2110: setupDropzone filter extend
+- `index.html` line 2128-2220: convertFileToHtml + convertXlsxToHtml + refactored execute handler
+
+### Pre-existing modifications NOT from this batch
+- v3.0.6 (Q3 badge + rebrand) — committed bbffd70
+- 6 v3.0h modes 全部 intact
+
+### Cadence brake (memory rule 7)
+- v3.0.4 + v3.0.5 + v3.0.6 60h 內 ship + 0 field data → brake violated
+- v3.0.7 接受 risk, 但**field-test window 之後要 pause** for v3.0.8+
+
+---
+
+**下一步**:等 user field-test v3.0.6 + v3.0.7 (mode-convert Excel + DOCX quality)。如發現 bug 修, 否則 v3.0.8 押後到 ≥50 routing decisions telemetry 後再定。

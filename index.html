@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>改 pdf 工具箱 v3.0.6</title>
+    <title>改 pdf 工具箱 v3.0.7</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
@@ -12,6 +12,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
         // Note: pdf-lib v1.x uses instance method pdfDoc.registerFontkit(fontkit).
@@ -331,19 +332,19 @@
             </section>
 
             <section id="mode-convert" class="mode-panel hidden bg-white rounded-xl shadow-lg p-6">
-                <h2 class="text-xl font-bold text-sky-700 mb-4">📝 Word 轉 PDF</h2>
-                <p class="text-gray-600 mb-4">將 Word 文件 (.docx) 批次轉換為 PDF 格式。</p>
+                <h2 class="text-xl font-bold text-sky-700 mb-4">📝 Word / Excel 轉 PDF</h2>
+                <p class="text-gray-600 mb-4">將 Word 文件 (.docx) 或 Excel 試算表 (.xlsx) 批次轉換為 PDF 格式。</p>
 
                 <div id="convert-dropzone" class="dropzone rounded-xl p-8 text-center cursor-pointer mb-4">
                     <div class="text-4xl mb-2">📝</div>
-                    <p class="text-gray-600">拖曳 Word/文字檔案到此處，或點擊上傳</p>
-                    <p class="dropzone-hint">Word (.docx) / .txt / .rtf,完成後打包成 ZIP 即下載</p>
-                    <input type="file" id="convert-input" multiple accept=".docx,.txt,.rtf" class="hidden">
+                    <p class="text-gray-600">拖曳 Word/Excel/文字檔案到此處，或點擊上傳</p>
+                    <p class="dropzone-hint">Word (.docx) / Excel (.xlsx) / .txt / .rtf,完成後打包成 ZIP 即下載</p>
+                    <input type="file" id="convert-input" multiple accept=".docx,.xlsx,.txt,.rtf" class="hidden">
                 </div>
 
                 <p class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
-                    ⚠️ 支援格式：<code>.docx</code> / <code>.txt</code> / <code>.rtf</code>。
-                    舊版 <code>.doc</code> 唔支援，請用 Word 開啟後另存為 <code>.docx</code>。
+                    ⚠️ 支援格式：<code>.docx</code> / <code>.xlsx</code> / <code>.txt</code> / <code>.rtf</code>。
+                    舊版 <code>.doc</code> 唔支援，請用 Word 開啟後另存為 <code>.docx</code>。Excel 公式只 render 計算後值,不會 re-evaluate。
                 </p>
 
                 <div id="convert-list" class="space-y-3 mb-4"></div>
@@ -2085,14 +2086,15 @@ A123456(7)
         });
 
         setupDropzone('convert-dropzone', 'convert-input', (files) => {
+            // v3.0.7: extend accept list to include .xlsx
             // S4: reject .doc here — mammoth browser build only supports .docx.
-            // .doc / .rtf / .txt are handled further down (txt/rtf direct read;
-            // .doc would produce a red-error PDF otherwise).
+            // .doc / .rtf / .txt / .xlsx are handled further down (txt/rtf direct read,
+            // xlsx via SheetJS, .doc would produce a red-error PDF otherwise).
             const accepted = [];
             const rejected = [];
             files.forEach(f => {
                 const lower = f.name.toLowerCase();
-                if (lower.endsWith('.docx') || lower.endsWith('.txt') || lower.endsWith('.rtf')) {
+                if (lower.endsWith('.docx') || lower.endsWith('.txt') || lower.endsWith('.rtf') || lower.endsWith('.xlsx')) {
                     accepted.push(f);
                 } else if (lower.endsWith('.doc')) {
                     rejected.push(f.name);
@@ -2124,16 +2126,66 @@ A123456(7)
             saveState();
         }
 
+        // v3.0.7: Refactored to support 4 file types — .docx, .xlsx, .txt, .rtf
+        // Each type routes to a dedicated converter helper below.
+        async function convertFileToHtml(file) {
+            const ext = file.name.toLowerCase().split('.').pop();
+            if (ext === 'txt' || ext === 'rtf') {
+                const text = await file.text();
+                return `<pre style="white-space:pre-wrap;word-wrap:break-word;margin:0;font-family:system-ui,Arial,'Noto Sans TC','Microsoft JhengHei',sans-serif;font-size:13px;line-height:1.7">${text.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>`;
+            } else if (ext === 'xlsx') {
+                return await convertXlsxToHtml(file);
+            } else if (ext === 'docx') {
+                const arrayBuffer = await file.arrayBuffer();
+                const result = await mammoth.convertToHtml({ arrayBuffer });
+                return result.value;
+            } else {
+                throw new Error(`不支援嘅格式: .${ext}`);
+            }
+        }
+
+        // v3.0.7: xlsx → HTML via SheetJS (XLSX.read + sheet_to_html)
+        // Limitations: formulas render as cached value, complex formatting (merged cells, colors) lost.
+        async function convertXlsxToHtml(file) {
+            if (typeof XLSX === 'undefined') {
+                throw new Error('SheetJS (XLSX) library 未載入。請檢查 CDN 連線。');
+            }
+            const arrayBuffer = await file.arrayBuffer();
+            const workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: true });
+            if (!workbook.SheetNames.length) {
+                return '<p style="color:#dc2626">xlsx 檔案冇任何 sheet。</p>';
+            }
+            const parts = [];
+            for (let i = 0; i < workbook.SheetNames.length; i++) {
+                const sheetName = workbook.SheetNames[i];
+                const sheet = workbook.Sheets[sheetName];
+                // sheet_to_html with editable:false → static table only
+                const html = XLSX.utils.sheet_to_html(sheet, { editable: false });
+                parts.push(`<h3 style="margin:1.5em 0 0.5em 0;color:#0369a1;font-size:14px">📊 ${escapeHtml(sheetName)}</h3>${html}`);
+            }
+            return parts.join('<hr style="margin:1em 0;border:none;border-top:1px dashed #ccc">');
+        }
+
         document.getElementById('convert-execute').addEventListener('click', async () => {
             showLoading('正在轉換檔案...\n已處理 0/0 個');
             try {
                 const zip = new JSZip();
                 const total = state.convertFiles.length;
+                const failures = [];
 
                 for (let i = 0; i < state.convertFiles.length; i++) {
                     const file = state.convertFiles[i];
                     document.getElementById('loading-text').textContent = `正在轉換檔案...\n已處理 ${i + 1}/${total} 個`;
-                    const filename = file.name.replace(/\.(docx?|txt|rtf)$/i, '');
+                    const filename = file.name.replace(/\.(docx?|xlsx|txt|rtf)$/i, '');
+
+                    let innerContent;
+                    try {
+                        innerContent = await convertFileToHtml(file);
+                    } catch (e) {
+                        console.error(`Convert failed for ${file.name}:`, e);
+                        failures.push(`${file.name}: ${e.message || e}`);
+                        continue;  // F4 fix: skip failed file, don't abort whole batch
+                    }
 
                     // S6: html2canvas(v0.4.x, embedded in html2pdf.js v0.10.1) 唔可以 capture
                     // 任何 off-screen element(position:fixed/absolute + 負 coords / transform
@@ -2147,29 +2199,22 @@ iframe.style.cssText = 'position:fixed;left:-99999px;top:0;width:794px;height:12
 document.body.appendChild(iframe);
 
 const idoc = iframe.contentDocument || iframe.contentWindow.document;
-const innerContent = await (async () => {
-    if (file.name.endsWith('.txt') || file.name.endsWith('.rtf')) {
-        const text = await file.text();
-        return `<pre style="white-space:pre-wrap;word-wrap:break-word;margin:0;font-family:system-ui,Arial,'Noto Sans TC',sans-serif">${text.replace(/</g, '&lt;')}</pre>`;
-    } else {
-        try {
-            const arrayBuffer = await file.arrayBuffer();
-            const result = await mammoth.convertToHtml({ arrayBuffer });
-            return result.value;
-        } catch (e) {
-            return `<p style="color:red">轉換失敗:${file.name} 格式不支援,請另存為 .docx</p>`;
-        }
-    }
-})();
-
 idoc.open();
 idoc.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
-body{margin:0;padding:20px;background:white;font-family:system-ui,Arial,'Noto Sans TC','Microsoft JhengHei',sans-serif;font-size:14px;line-height:1.8;color:#000}
-h1,h2,h3,h4{font-family:inherit;margin:0.5em 0}
-p{margin:0.5em 0}
-table{border-collapse:collapse;margin:0.5em 0}
-td,th{border:1px solid #ccc;padding:4px 8px}
+body{margin:0;padding:24px;background:white;font-family:system-ui,Arial,'Noto Sans TC','Microsoft JhengHei',sans-serif;font-size:13px;line-height:1.7;color:#1f2937}
+h1,h2,h3,h4{font-family:inherit;margin:0.6em 0 0.3em 0;color:#0c4a6e}
+h1{font-size:1.5em}
+h2{font-size:1.3em}
+h3{font-size:1.1em}
+p{margin:0.4em 0}
+table{border-collapse:collapse;margin:0.6em 0;width:100%;font-size:12px}
+table,th,td{border:1px solid #cbd5e1}
+th{background:#f1f5f9;font-weight:600;text-align:left;padding:6px 10px;color:#0f172a}
+td{padding:5px 10px;text-align:left;vertical-align:top}
+tr:nth-child(even) td{background:#f8fafc}
 img{max-width:100%;height:auto}
+ul,ol{margin:0.4em 0;padding-left:1.5em}
+li{margin:0.2em 0}
 </style></head><body>${innerContent}</body></html>`);
 idoc.close();
 
@@ -2177,14 +2222,18 @@ idoc.close();
 await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
 const pdfBlob = await html2pdf().set({
-    margin: 15,
+    margin: 12,
     image: { type: 'jpeg', quality: 0.95 },
-    html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' },
+    html2canvas: { scale: 3, useCORS: true, logging: false, backgroundColor: '#ffffff' },
     jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
 }).from(idoc.body).outputPdf('blob');
 
 document.body.removeChild(iframe);
 zip.file(filename + '.pdf', pdfBlob);
+                }
+
+                if (failures.length === total && total > 0) {
+                    throw new Error('所有檔案都轉換失敗');
                 }
 
                 const content = await zip.generateAsync({ type: 'blob' });
@@ -2194,8 +2243,14 @@ zip.file(filename + '.pdf', pdfBlob);
                 a.download = 'converted_pdfs.zip';
                 a.click();
                 URL.revokeObjectURL(url);
+
+                if (failures.length > 0) {
+                    toast(`⚠️ ${total - failures.length}/${total} 個成功。失敗: ${failures.slice(0, 3).join('、')}${failures.length > 3 ? '…' : ''}`, 'warn', 6000);
+                } else {
+                    toast(`✅ 已轉換 ${total} 個檔案`, 'success', 3000);
+                }
             } catch (err) {
-                toast(friendlyError(err, '圖片轉換失敗'), 'error', 5000);
+                toast(friendlyError(err, '轉換失敗'), 'error', 5000);
             }
             hideLoading();
         });
