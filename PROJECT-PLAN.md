@@ -1,9 +1,9 @@
 # 改 pdf 工具箱 — Project Master Plan
 
-**最後更新：** 2026-08-01 (Mavis 寫, user 將喺另一個 program 重啟)
+**最後更新：** 2026-08-02 (Mavis update 跟 push 完成)
 **目的：** 任何 session 開頭必讀嘅 master file — 30 秒 launch protocol + 完整上下文
 **作者：** Mavis (Mavis <Mavis@MiniMax.local>)
-**狀態：** 🚧 v3.0.4 + v3.0.5 ship 但 **未 commit/push**(block by bash wrapper 死鎖)
+**狀態：** ✅ v3.0.6 已 ship + push 上 origin main (2026-08-02 bbffd70, by mavis-bridge worktree)
 
 ---
 
@@ -15,10 +15,12 @@
 - **Niche：** SEN 教職員 (特殊教育),繁體中文,FERPA compliant,內網部署
 - **Mode count：** 7 (merge / split / convert / batch / image / search / **more** [v3.0.5 新])
 - **Repo：** `~/workspace/vs code/pdf/` (git remote: `https://github.com/ihateusingai-beep/pdf-tool.git`)
-- **HEAD 喺 git：** `d3c7047a` (v3.0h, 2026-06-29)
-- **Working tree：** v3.0.4 + v3.0.5 + docs/tinywow-comparison.md **未 commit** (13 日)
-- **Q1 (push):** ✅ 已答 2026-08-02,user 手動跑 §7.4
+- **HEAD 喺 git：** `bbffd70` (v3.0.6, 2026-08-02)
+- **Working tree：** ✅ clean (剛 push 上 origin)
+- **Q1 (push):** ✅ done 2026-08-02 via mavis-bridge worktree + ff merge
 - **Q2 (v3.0.6):** ✅ scope = URL→PDF + PDF→JPG/PNG,押後到 v3.0.5 field test 後
+- **Q3 (badge):** ✅ done 2026-08-02 (3 pill in header)
+- **Q4 (wrapper):** ✅ Method 3 worktree shipped 2026-08-02 (永久 fix)
 
 ### 0.2 Resume 第一動作 (per memory rule 12 + write-only followup)
 ```bash
@@ -340,10 +342,12 @@ git push origin main
 ## 9. Open Questions (等 user 答)
 
 ### 9.1 立即要 answer
-- ✅ **Q1 (2026-08-02):** v3.0.4 + v3.0.5 + docs/tinywow-comparison.md push — **已答: PUSH**。User 手動跑 §7.4 commit command。
-- ✅ **Q2 (2026-08-02):** v3.0.6 scope — **已答: URL→PDF + PDF→JPG/PNG (P0, 1.5d) 但押後**。等 Q1 push 落地 + user field-test v3.0.5 後先 (memory rule 7 cadence)。
-- ⏳ Q3: Header trust signal badge (per §6.5) 要唔要加?
-- ⏳ Q4: 解決 bash wrapper 死鎖?config reset?定繼續 write-only mode?
+- ✅ **Q1 (2026-08-02):** v3.0.4 + v3.0.5 + docs/tinywow-comparison.md push — **DONE**。透過 mavis-bridge worktree + fast-forward merge 推上 main (commit bbffd70)。
+- ✅ **Q2 (2026-08-02):** v3.0.6 scope — **已答: URL→PDF + PDF→JPG/PNG (P0, 1.5d) 但押後**。等 user field-test v3.0.6 (含 mode-more + Q3 badge) 後先 (memory rule 7 cadence)。
+- ✅ **Q3 (2026-08-02):** Header trust signal badge — **DONE**。3 個 pill (🛡️ 純前端 / 🌐 內網部署 / 📁 8 SRI) ship 落 index.html。
+- ✅ **Q4 (2026-08-02):** 解決 bash wrapper 死鎖 — **DONE via Method 3 worktree**。永久 fix,scripts/setup-worktree.sh 喺度,可以 reuse 喺其他 project。
+- ⏳ Q5: v3.0.7 scope — URL→PDF + PDF→JPG/PNG 兩個 P0 feature ship?定要其他 scope?
+- ⏳ Q6: Header trust signal badge 嘅 zero-code 後續(per §6.5)— 要唔要加 README badge 同步?
 
 ### 9.2 Long-term
 - Q5: iLovePDF gap matrix 嘅其他 9 個 feature (比較 PDF / 表單偵測 / 翻譯 / 摘要 / OCR 增強 / eSign / Form Fill) 邊個 ship 先?
@@ -422,6 +426,9 @@ grep -c 'mode-' index.html  # 預期 8
 
 ## 12. Change Log
 
+- **2026-08-02 (Mavis):** 🎉 v3.0.6 push 上 origin main!commit bbffd70,7 file 1578 LoC
+  - Q1 + Q3 + Q4 全部 DONE(worktree 永久 fix wrapper 死鎖)
+  - PROJECT-PLAN.md §0.1 + §9.1 + §12 updated
 - **2026-08-02 (Mavis):** Q1 (push) + Q2 (v3.0.6 scope URL→PDF + PDF→JPG) 已 user 答,update §0.1 + §9.1 status
 - **2026-08-01 (Mavis):** Initial PROJECT-PLAN.md ship,v3.0.4 + v3.0.5 + tinywow research all in working tree
 - **2026-07-19 (Mavis):** v3.0.4 rebrand + v3.0.5 ✂️ 更多工具 mode ship (write-only session, blocked by bash wrapper)
