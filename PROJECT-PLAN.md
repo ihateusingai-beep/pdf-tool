@@ -15,12 +15,14 @@
 - **Niche：** SEN 教職員 (特殊教育),繁體中文,FERPA compliant,內網部署
 - **Mode count：** 7 (merge / split / convert / batch / image / search / **more** [v3.0.5 新])
 - **Repo：** `~/workspace/vs code/pdf/` (git remote: `https://github.com/ihateusingai-beep/pdf-tool.git`)
-- **HEAD 喺 git：** `bbffd70` (v3.0.6, 2026-08-02)
-- **Working tree：** ✅ clean (剛 push 上 origin)
-- **Q1 (push):** ✅ done 2026-08-02 via mavis-bridge worktree + ff merge
-- **Q2 (v3.0.6):** ✅ scope = URL→PDF + PDF→JPG/PNG,押後到 v3.0.5 field test 後
-- **Q3 (badge):** ✅ done 2026-08-02 (3 pill in header)
-- **Q4 (wrapper):** ✅ Method 3 worktree shipped 2026-08-02 (永久 fix)
+- **HEAD 喺 git：** `0311a53` (v3.0.7.1, 2026-08-02)
+- **Working tree：** ✅ clean
+- **Q1 (push):** ✅ done
+- **Q2 (v3.0.7):** ✅ Excel→PDF + DOCX quality shipped (commit 78b9085)
+- **Q3 (badge):** ✅ done v3.0.6
+- **Q4 (wrapper):** ✅ Method 3 worktree shipped
+- **Q5 (v3.0.8):** 📄 spec shipped `docs/v3.0.8-spec.md` (PDF→TXT + PDF→JPG/PNG), code ship **BLOCKED by cadence brake** (memory rule 7)
+- **v3.0.7.1 hotfix:** ✅ shipped commit 0311a53 (6 P0 fix)
 
 ### 0.2 Resume 第一動作 (per memory rule 12 + write-only followup)
 ```bash
@@ -209,33 +211,47 @@ ls docs/                        # 應該見到 tinywow-comparison.md
 | Feature | 對標 TinyWow | 技術 | 預估 LoC | 預估 budget |
 |---------|--------------|------|----------|------------|
 | **URL → PDF** | URL to PDF | iframe sandbox + html2pdf.js (CDN ✅) | ~150 | 1.5d |
-| **PDF → JPG/PNG** | PDF to JPG | pdfjs render canvas → blob → download | ~80 | 1d |
+| **PDF → TXT + JPG/PNG** | PDF to Text + JPG | pdf.js textContent + render canvas | ~130 | 1.5d ← **v3.0.8 spec 已 ship** (見 docs/v3.0.8-spec.md) |
 
-### 6.2 P1 candidates (medium ROI)
+### 6.2 P1 candidates (medium ROI, 等 v3.0.8 field-test 後)
 | Feature | 對標 TinyWow | 技術 | 預估 LoC | 預估 budget |
 |---------|--------------|------|----------|------------|
+| PDF → Audio (TTS) | (差異化) | Web Speech API + pdf.js text | ~180 | 2d ← accessibility 殺手鐧 |
 | Rotate PDF | Rotate PDF | pdf-lib rotate | ~50 | 0.5d |
 | Extract Images | Extract Images | pdfjs image extraction | ~100 | 1d |
 | HEIC → PDF | HEIC to PDF | heic2any (CDN) + image→PDF | ~50 | 0.5d |
 | PDF → CSV | PDF to CSV | table detection (text position) | ~200 | 2d |
+| PDF → Markdown | (custom) | text + pattern guess | ~120 | 1.5d |
+| PDF → HTML | (custom) | text + structure | ~150 | 1.5d |
 
 ### 6.3 P2 candidates (skip for SEN niche)
 - ❌ PDF to Word / Excel / PowerPoint (server-side, 違反 stance)
+- ❌ PDF to EPUB / MOBI / AZW3 (reflow hard, niche 弱)
+- ❌ PDF to TIFF / SVG / HEIC (niche 罕用)
 - ❌ Translate PDF (需要 LLM, 違反 stance)
 - ❌ PDF Forms / Fill (高複雜度, niche 罕用)
 - ❌ eSign / Annotation (高複雜度, niche 罕用)
 
 ### 6.4 Memory rule 7 cadence check
 - 連續 2 個 routing-layer change 60 小時內 ship + 冇 field data → **pause 2-3 日**,等 ≥50 routing decisions telemetry
-- v3.0.4 + v3.0.5 都係 routing-layer (新 mode-more),v3.0.6 之後**等 user feedback 先**
+- **v3.0.4 + v3.0.5 + v3.0.6 + v3.0.7 + v3.0.7.1 = 5 routing-layer change in 60h, 0 field data, 嚴重 brake**
+- v3.0.8 必須 pause field-test 1-2 週 (per memory rule 7) ← **CADENCE BRAKE HOLD**
+- 將來 v3.0.9+ 需用 telemetry 證明 ≥50 routing decisions 先可 ship
 
-### 6.5 Header trust signal badge (zero-code, marketing)
-跟 tinywow-comparison.md §6.3 建議, footer 加 3 個 badge:
+### 6.5 Header trust signal badge (✅ shipped v3.0.6)
+跟 tinywow-comparison.md §6.3 建議, header 加 3 個 badge:
 - 🛡️ 100% 純前端 — 學生敏感資料不外流
 - 🌐 內網部署 ready — 學校 IT 可自行 host
-- 📁 8 個 CDN SRI pinned — 防止供應鏈攻擊
+- 📁 8 個 CDN SRI pinned — 防止供應鏈攻擊 (v3.0.7.1 加 crossorigin+referrerpolicy partial mitigation,真實 sha384 由 verify-sri.sh 生成)
 
-**注意:** 要放 header badge 而唔係 footer (highlight 對 TinyWow 嘅 unique value prop)。
+### 6.6 v3.0.7.1 hotfix shipped (2026-08-02)
+- Risk-1 CDN partial SRI mitigation + verify-sri.sh
+- Risk-2 memory leak fix (5 single-shot mode release)
+- Risk-3 isProcessing flag + tab disable
+- Auto-2 debounced auto-save 5s
+- Pain-B keyboard shortcut (1-7 / Ctrl+O / Esc)
+- UI-1 inline SVG hero
+- 6/8 P0 fix (UI-2 + UI-3 押後 v3.0.8)
 
 ---
 
