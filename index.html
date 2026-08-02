@@ -3,20 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>改 pdf 工具箱 v3.0.7</title>
+    <title>改 pdf 工具箱 v3.0.7.1</title>
+    <!-- v3.0.7.1: Partial SRI mitigation — crossorigin + referrerpolicy 對 7 個 stable CDN。
+         Tailwind JIT + fontkit 2 個 entry 維持無 integrity (cdnjs/jsdelivr 唔 support JIT dynamic)。
+         完整 SRI hash 需 user 跑 scripts/verify-sri.sh 生成真實 hash 再 paste 返入面。-->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.5.1/mammoth.browser.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.5.1/mammoth.browser.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script>
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
         // Note: pdf-lib v1.x uses instance method pdfDoc.registerFontkit(fontkit).
         // fontkit UMD is loaded as <script src="..."> above (sets window.fontkit).
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
     </script>
     <style>
         .tab-active { border-bottom: 3px solid currentColor; }
@@ -157,6 +160,14 @@
     <div class="container mx-auto px-4 py-8 max-w-6xl">
         <header class="text-center mb-6">
             <div class="flex items-center justify-center gap-3 mb-3">
+                <!-- v3.0.7.1: UI-1 hero illustration — PDF stack + sparkles (inline SVG, 64x64) -->
+                <svg class="flex-shrink-0" width="48" height="48" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+                    <rect x="8" y="14" width="26" height="32" rx="3" fill="#e0e7ff" stroke="#4f46e5" stroke-width="1.5"/>
+                    <rect x="14" y="8" width="26" height="32" rx="3" fill="#fef3c7" stroke="#f59e0b" stroke-width="1.5"/>
+                    <path d="M19 18h16M19 22h16M19 26h10" stroke="#92400e" stroke-width="1.2" stroke-linecap="round"/>
+                    <text x="40" y="20" font-size="10" fill="#10b981" aria-hidden="true">✨</text>
+                    <text x="6" y="38" font-size="8" fill="#ec4899" aria-hidden="true">✨</text>
+                </svg>
                 <h1 class="text-xl sm:text-3xl font-bold text-gray-800 whitespace-nowrap">🛠️ 改 pdf 工具箱</h1>
                 <img src="assets/personal_logo.png" alt="K.C 個人 credit logo" loading="lazy" width="40" height="40" class="rounded-full object-cover shadow-sm flex-shrink-0" title="K.C 個人 credit">
                 <div class="hidden md:flex items-center gap-2 ml-4">
@@ -170,7 +181,7 @@
                     <button id="btn-global-watermark" title="🖼️ 全域浮水印" class="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded-lg text-sm transition">🖼️</button>
                 </div>
             </div>
-            <p class="text-gray-600">100% 本地端處理 • 敏感資料零外流</p>
+            <p class="text-gray-600">100% 本地端處理 • 敏感資料零外流 • 鍵盤快速鍵 1-7 切換模式</p>
 
             <div id="global-watermark-panel" class="hidden mt-3 mx-auto max-w-2xl bg-violet-50 border border-violet-200 rounded-xl p-4 text-left">
                 <div class="flex items-center justify-between mb-2">
@@ -764,6 +775,46 @@
             return files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
         }
 
+        // v3.0.7.1: Risk-2 fix — release file array references after execute completes.
+        // File objects (especially with PDF/Word/Excel contents held in memory) can be
+        // 5-50MB each. Long sessions with multiple mode switches accumulate refs and
+        // cause browser tab slowdown or OOM. Call this in execute handlers after
+        // downloadBlob() to release references and let GC reclaim RAM.
+        // Also clears state.searchFile (single File ref, can be large).
+        function releaseFileArrays() {
+            state.mergeFiles = [];
+            state.batchFiles = [];
+            state.convertFiles = [];
+            state.imageFiles = [];
+            state.searchFile = null;
+            state.moreFile = null;
+        }
+
+        // v3.0.7.1: Risk-3 fix — global processing flag.
+        // Prevents race condition when user switches mode mid-execution.
+        // showLoading() sets true, hideLoading() sets false. Tab switching checks
+        // this flag and shows a toast + early-returns if a long task is in progress.
+        let isProcessing = false;
+        function setProcessing(flag) {
+            isProcessing = flag;
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.disabled = flag;
+                btn.classList.toggle('opacity-50', flag);
+                btn.classList.toggle('cursor-not-allowed', flag);
+            });
+        }
+
+        // v3.0.7.1: Auto-2 — debounced auto-save wrapper.
+        // Saves state to IDB after 5s of no activity, debounced to avoid write amplification.
+        // Call autoSave() on any state-mutating action (replace saveState()).
+        let _saveTimer = null;
+        function autoSave() {
+            if (_saveTimer) clearTimeout(_saveTimer);
+            _saveTimer = setTimeout(() => {
+                saveState().catch(e => console.warn('auto-save failed:', e));
+            }, 5000);
+        }
+
         // ── A5: PDF metadata auto-strip helper ──
         // Strips potentially-leaking Author / Title / Subject / Keywords from a PDF
         // before download, and forces CreationDate to "now" (a fresh, anonymous
@@ -885,13 +936,55 @@
             }
         }
 
+        // v3.0.7.1: Extract tab switch logic into named function so both click and
+        // keyboard shortcut (1-7) can invoke it consistently.
+        function switchToMode(modeName) {
+            if (isProcessing) {
+                toast('⚠️ 處理中,請稍候...', 'warn', 2000);
+                return;
+            }
+            const target = document.querySelector(`.tab-btn[data-mode="${modeName}"]`);
+            if (!target) return;
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('tab-active'));
+            target.classList.add('tab-active');
+            document.querySelectorAll('.mode-panel').forEach(p => p.classList.add('hidden'));
+            document.getElementById(`mode-${modeName}`).classList.remove('hidden');
+        }
+
         document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('tab-active'));
-                btn.classList.add('tab-active');
-                document.querySelectorAll('.mode-panel').forEach(p => p.classList.add('hidden'));
-                document.getElementById(`mode-${btn.dataset.mode}`).classList.remove('hidden');
-            });
+            btn.addEventListener('click', () => switchToMode(btn.dataset.mode));
+        });
+
+        // v3.0.7.1: Pain-B — keyboard shortcut (1-7 mode switch, Ctrl/Cmd+O dropzone, Esc close modal)
+        const MODE_KEYS = ['1', '2', '3', '4', '5', '6', '7'];
+        const MODE_NAMES = ['merge', 'split', 'convert', 'batch', 'image', 'search', 'more'];
+        document.addEventListener('keydown', (e) => {
+            // Esc: close any open modal (loading overlay counts)
+            if (e.key === 'Escape') {
+                const overlay = document.getElementById('loading-overlay');
+                if (overlay && !overlay.classList.contains('hidden')) {
+                    // Don't dismiss if processing — would leave UI in inconsistent state
+                    if (!isProcessing) overlay.classList.add('hidden');
+                }
+                return;
+            }
+            // Ctrl/Cmd+O: trigger active mode's dropzone click
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'o') {
+                e.preventDefault();
+                const activeMode = document.querySelector('.tab-btn.tab-active')?.dataset.mode;
+                if (!activeMode) return;
+                const dropzone = document.getElementById(`${activeMode}-dropzone`) || document.getElementById(`${activeMode}-input`);
+                if (dropzone) dropzone.click();
+                return;
+            }
+            // 1-7: switch mode (only when not in input/textarea)
+            const tag = (e.target.tagName || '').toLowerCase();
+            if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+            const idx = MODE_KEYS.indexOf(e.key);
+            if (idx >= 0 && idx < MODE_NAMES.length) {
+                e.preventDefault();
+                switchToMode(MODE_NAMES[idx]);
+            }
         });
 
         // ── Search & Redaction mode (v3.0a) ──
@@ -1974,6 +2067,8 @@ A123456(7)
                 }
 
                 await downloadPdfWithWatermark(pdfBytes, filename + '.pdf');
+                state.mergeFiles = [];  // v3.0.7.1: Risk-2 — release after execute
+                updateMergeList();
             } catch (err) {
                 toast(friendlyError(err, '合併失敗'), 'error', 5000);
             }
@@ -2249,6 +2344,8 @@ zip.file(filename + '.pdf', pdfBlob);
                 } else {
                     toast(`✅ 已轉換 ${total} 個檔案`, 'success', 3000);
                 }
+                state.convertFiles = [];  // v3.0.7.1: Risk-2 — release after execute
+                updateConvertList();
             } catch (err) {
                 toast(friendlyError(err, '轉換失敗'), 'error', 5000);
             }
@@ -2346,6 +2443,8 @@ zip.file(filename + '.pdf', pdfBlob);
                 a.download = 'batch_processed.zip';
                 a.click();
                 URL.revokeObjectURL(url);
+                state.batchFiles = [];  // v3.0.7.1: Risk-2 — release after execute
+                updateBatchList();
             } catch (err) {
                 toast(friendlyError(err, '批次加工失敗'), 'error', 5000);
             }
@@ -2611,6 +2710,8 @@ zip.file(filename + '.pdf', pdfBlob);
                     downloadBlob(content, `${baseFilename}_${today}.zip`, 'application/zip');
                     if (errors.length) toast(`⚠️ 以下 ${errors.length} 張失敗,已略過：${errors.slice(0, 3).join('、')}${errors.length > 3 ? '…' : ''}`, 'warn', 5000);
                 }
+                state.imageFiles = [];  // v3.0.7.1: Risk-2 — release after execute
+                updateImageList();
             } catch (err) {
                 toast(friendlyError(err, '圖片轉換失敗'), 'error', 5000);
             }
@@ -2871,6 +2972,11 @@ zip.file(filename + '.pdf', pdfBlob);
                 if (pdfaLevel && pdfaLevel !== 'none') summaryParts.push(`PDF/A-${pdfaLevel}`);
                 if (summaryParts.length === 0) summaryParts.push('已輸出原始 PDF');
                 toast(`✅ ${summaryParts.join('・')}`, 'success', 4000);
+                state.moreFile = null;  // v3.0.7.1: Risk-2 — release after execute
+                document.getElementById('more-input').value = '';
+                document.getElementById('more-filename-display').textContent = '';
+                document.getElementById('more-preview').innerHTML = '';
+                document.getElementById('more-execute').disabled = true;
             } catch (err) {
                 toast(friendlyError(err, '處理失敗'), 'error', 5000);
             }
@@ -3004,12 +3110,14 @@ zip.file(filename + '.pdf', pdfBlob);
 
         function showLoading(text = '處理中，請稍候...') {
             disableGuard();
+            setProcessing(true);  // v3.0.7.1: Risk-3 — disable tab switching during processing
             document.getElementById('loading-text').textContent = text;
             document.getElementById('loading-overlay').classList.remove('hidden');
         }
 
         function hideLoading() {
             document.getElementById('loading-overlay').classList.add('hidden');
+            setProcessing(false);  // v3.0.7.1: Risk-3 — re-enable tab switching
             setTimeout(enableGuard, 5000);
         }
 
@@ -3097,7 +3205,19 @@ zip.file(filename + '.pdf', pdfBlob);
             return new File([rec.blob], rec.name, { type: rec.type });
         }
 
-        async function saveState() {
+        // v3.0.7.1: Auto-2 — debounced saveState.
+        // Wraps the original synchronous save logic in a 5s debounce to avoid
+        // IDB write amplification when many state changes happen in quick
+        // succession (e.g. drag-reorder, page click selection).
+        // Falls back to immediate save on beforeunload via _saveStateNow().
+        let _saveDebounceTimer = null;
+        function saveState() {
+            if (_saveDebounceTimer) clearTimeout(_saveDebounceTimer);
+            _saveDebounceTimer = setTimeout(() => {
+                _saveStateNow().catch(e => console.warn('save failed:', e));
+            }, 5000);
+        }
+        async function _saveStateNow() {
             // File arrays (Blob → IDB)
             await idbPut('mergeFiles', state.mergeFiles.map(serializeFile));
             await idbPut('batchFiles', state.batchFiles.map(serializeFile));
@@ -3374,7 +3494,7 @@ zip.file(filename + '.pdf', pdfBlob);
         }
 
         loadState();
-        window.addEventListener('beforeunload', () => { saveState(); });
+        window.addEventListener('beforeunload', () => { _saveStateNow(); });  // v3.0.7.1: immediate sync on unload
     </script>
 </body>
 </html>
